@@ -489,11 +489,11 @@ class Poller(Device):
             self._start_child(setup)
 
     def _start_child(self, setup):
-        poller_script = path.join(config.nicos_root, 'bin', 'nicos-poller')
+        # try to find executable:
         additional_args = []
         if session._daemon_mode == 'systemd':
             additional_args.append('-D')
-        process = createSubprocess([sys.executable, poller_script, setup] +
+        process = createSubprocess([sys.executable, "-m", "nicos.services.poller", setup] +
                                    additional_args)
         # we need to keep a reference to the Popen object, since it calls
         # os.wait() itself in __del__
