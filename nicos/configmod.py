@@ -32,6 +32,7 @@ from os import path
 from re import compile as regexcompile, escape as regexescape
 
 import tomlkit
+from platformdirs import PlatformDirs, user_config_dir
 
 
 class config:
@@ -46,6 +47,9 @@ class config:
     umask = None  # as a string!
 
     nicos_root = path.normpath(path.dirname(path.dirname(__file__)))
+    nicos_cfg_root = user_config_dir(
+        appname='nicos', appauthor='nicos',
+    )
 
     setup_package = None  # the root package to find setups in
     setup_subdirs = []  # setup groups to be used, as a list
@@ -136,7 +140,8 @@ def readToml(filename):
 def readConfig():
     """Read the basic NICOS configuration.  This is a multistep process:
 
-    * First, we read the "local" nicos.conf (the one in the root dir)
+    * First, we read the "local" nicos.conf (the one in either the root dir,
+      a site configuration directory, or the user's configuration directory)
       and try to find out our instrument from it or the environment.
     * Then, find the instrument-specific nicos.conf and read its values.
     * Finally, go back to the "local" config and overwrite values from the
@@ -145,7 +150,21 @@ def readConfig():
     # Read the local config from the standard path.
     # Get the root path of the NICOS install.
     nicos_root = config.nicos_root
-    global_cfg = readToml(path.join(nicos_root, 'nicos.conf'))
+    nicos_cfg_fn = 'nicos.conf'
+    global_cfg = readToml(path.join(nicos_root, nicos_cfg_fn))
+    if global_cfg:
+        config.nicos_cfg_root = nicos_root
+    else:
+        # Iterate from least specific (site) to most specific (user) until a
+        # configuration file is found
+        dirs = PlatformDirs('nicos')
+        for config_dir in [dirs.site_config_path, dirs.user_config_path]:
+            config_file = config_dir / nicos_cfg_fn
+            if config_file.exists():
+                global_cfg = readToml(config_file)
+                # update the configuration to use
+                config.nicos_cfg_root = str(config_dir)
+                break
 
     # Apply global PYTHONPATH, so that we can find the setup package in it.
     if 'PYTHONPATH' in global_cfg.get('environment', {}):
@@ -192,6 +211,7 @@ def readConfig():
     values.update({'instrument': instr})
 
     values['nicos_root'] = nicos_root
+    values['nicos_cfg_root'] = config.nicos_cfg_root
     values['setup_package'] = setup_package
     values['setup_package_path'] = setup_package_path
     return values, environment
