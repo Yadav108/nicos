@@ -1,0 +1,41 @@
+[project]
+name = "nicos_demo"
+description = "NICOS Customizations and Extensions for DEMO"
+requires-python = ">=3.9"
+dynamic = ["version"]
+dependencies = [
+    "nicos",
+]
+
+[project.optional-dependencies]
+gui = [
+    "nicos[gui]"
+]
+
+[dependency-groups]
+dev = [
+    "nicos[dev]"
+]
+
+[tool.uv.sources]
+# `nicos_demo` depends on `nicos`, which should be installed from this workspace:
+nicos = { workspace = true }
+
+# Define an entry point that allows to register this module as NICOS plugin.
+[project.entry-points."nicos.plugins"]
+DEMO = "nicos_demo"
+
+# Configure build backend:
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning", "uv_build>=0.9.18,<0.10.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist.force-include]
+# Explicitly include files at module root and rewrite their path
+"." = "nicos_demo"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nicos_demo"]
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
