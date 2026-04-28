@@ -1,4 +1,4 @@
-.PHONY: clean clean-demo install inplace-install install-venv install-requirements \
+.PHONY: clean clean-demo \
 	guirc check setupcheck test testall test-coverage lint \
 	changelint manualrelease release help
 
@@ -7,6 +7,7 @@ SHELL=/bin/bash
 RCC5 = pyrcc5
 RCC6 = /usr/lib64/qt6/libexec/rcc
 PYTHON = /usr/bin/env python3
+UV = /usr/bin/env uv
 
 nicos/guisupport/gui_rc_qt5.py: resources/nicos-gui.qrc
 	-$(RCC5) -o $@ $<
@@ -26,41 +27,6 @@ clean-demo: clean
 	-rm -rf data/logbook data/20*
 	-rm -rf log/poller* log/cache log/daemon log/elog log/nicos log/watchdog log/simulation log/monitor*
 	-rm -f data/current
-
-install:
-	@echo "Installing to $(DESTDIR)$(PREFIX)..."
-	@echo
-	@if [ -z "$(PREFIX)" ]; then echo "PREFIX is empty! Do not run make install on instruments"; exit 1; fi
-	mkdir -p $(DESTDIR)$(PREFIX)
-	$(PYTHON) setup.py install --prefix=$(PREFIX) \
-	                        $(and $(DESTDIR),--root=$(DESTDIR)) \
-				$(and $(INSTRUMENT),--instrument=$(INSTRUMENT)) \
-				$(and $(SETUPPACKAGE), --setup-package=$(SETUPPACKAGE)) \
-				$(and $(INSTALL_LAYOUT), --install-layout=$(INSTALL_LAYOUT))
-
-inplace-install:
-	-ln -sf -t /etc/init.d "$$(pwd)/etc/nicos-system"
-	-ln -sf -t /usr/bin "$$(pwd)"/bin/*
-
-install-venv:
-	if [ -z "$(VENVNAME)" ]; then export VENVNAME=nicos-venv ; fi; \
-	if [ -z "$(USEPYTHON)" ]; then export USEPYTHON=`which python3`; fi; \
-	echo "Installing into venv: $(DESTDIR)$${VENVNAME}"; \
-	echo "using $${USEPYTHON}"; \
-	$${USEPYTHON} -m venv --copies --system-site-packages $(DESTDIR)$${VENVNAME}; \
-	. $(DESTDIR)$${VENVNAME}/bin/activate; \
-	pip install -U pip ; \
-	pip install -r requirements.txt ; \
-	python setup.py install
-
-install-requirements:
-	@echo "Trying to install up-to-date requirements using pip"
-	@echo "If something goes wrong, try updating by hand, maybe you need root privileges"
-	@echo "Updating pip..."
-	pip install -U pip
-	@echo "Install requirements"
-	pip install -r requirements.txt
-
 
 check:
 	$(PYTHON) tools/check-setups $(CHECK_DIRS)
@@ -93,14 +59,9 @@ manualrelease: test release
 
 release:
 	cd doc; rm -rf build/html; ${MAKE} html
-	$(PYTHON) setup.py sdist
+	$(UV) build
 
 help:
-	@echo "Important targets:"
-	@echo "  install         - install to $(DESTDIR)$(PREFIX)"
-	@echo "  inplace-install - create links from /usr/bin and /etc/init.d to here"
-	@echo "  install-venv    - install into a Python virtual environment"
-	@echo
 	@echo "Development targets:"
 	@echo "  pod-demo        - start nicos-demo pod using podman or docker"
 	@echo "  clean-demo      - clean up files created by nicos-demo"

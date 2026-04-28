@@ -30,14 +30,16 @@ The bug tracker and project wiki are at
 
 .. include:: ../../INSTALL
 
+.. _inst_demo:             
 
-Configure for experimenting
----------------------------
+Running the demonstration setup
+-------------------------------
 
-Now you can start the individual :ref:`components <components>`.  A setup that
-uses all the major components can be started with the single command::
+After installing NICOS according to the instructions above, you can start the
+individual :ref:`components <components>`. A setup that uses all the major
+components can be started with the single command::
 
-  bin/nicos-demo
+  uv run nicos-demo
 
 This starts the cache, poller, electronic logbook, and daemon services, and also
 starts the graphical interface and a status monitor.
@@ -50,14 +52,39 @@ help for an individual device.
 .. You can continue with :ref:`the first steps <firststeps>` from here.
 
 
-Configure and build the distribution
+Configure NICOS
+---------------
+
+On startup, the toplevel ``nicos.conf`` file (see :ref:`nicosconf`) will be
+searched for in the following locations (in order):
+
+- in the site-wide directory, i.e. ``/etc/xdg/nicos/nicos.conf`` on GNU/Linux, or 
+- the ``nicos`` directory in your standard user configuration path, i.e. on
+  GNU/Linux systems, this would be ``~/.config/nicos/nicos.conf``.
+
+Both these paths can be modified by setting the ``XDG_CONFIG_DIRS`` or
+``XDG_CONFIG_HOME`` environment variable, respectively, to point to a different
+location. See the corresponding XDG variable documentation for reference:
+https://platformdirs.readthedocs.io/en/latest/parameters.html#xdg-env-vars
+
+For backwards compatibility, the root of the source repository (i.e. the
+``nicos_root`` folder) will be searched first. In case NICOS has been deployed from
+a wheel package, this path would most likely not point to a suitable location.
+Therefore, prefer the XDG standard directories as place for ``nicos.conf``.
+
+   
+Build the distribution
 ------------------------------------
 
-You can use ``make install PREFIX=/some/prefix`` to install NICOS into a
-directory.  The target also supports ``DESTDIR`` for building packages.
+You can build source and wheel packages by running::
 
-The toplevel ``nicos.conf`` file (see :ref:`nicosconf`) will be installed in
-that directory and will be loaded on startup. In order to customize the
-contents of the configuration file the ``INSTRUMENT`` and ``SETUPPACKAGE``
-variables can be set to configure the corresponding ``instrument`` and
-``setup_package`` entries.
+  uv build --all-packages
+
+Similarly as with the ``sync`` command, you can specify single packages instead by using e.g.::
+
+  uv build --package nicos-demo
+
+To publish the resulting package(s) to an index, use::
+
+  uv publish
+

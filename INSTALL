@@ -1,10 +1,30 @@
+Quickstart
+----------
+
+* :ref:`Install native dependencies <inst_native>`: For Debian-based systems, this would be ``apt update && apt install curl git build-essential python3-dev pkg-config qtbase5-dev qtwebengine5-dev libsystemd-dev``
+* Clone the repository: ``git clone ssh://forge.frm2.tum.de:29418/frm2/nicos/nicos``
+* :ref:`Install uv <inst_uv>`: ``curl -LsSf https://astral.sh/uv/install.sh | sh``
+* :ref:`Run the demonstration setup <inst_demo>`: ``uv run --extra gui nicos-demo``
+
 Requirements
 ------------
 
-* At least Python 3.9
+This section details the dependencies of NICOS. For managing and installing
+dependencies, please see the section on :ref:`using uv <inst_uv>`.
 
 If not mentioned otherwise, Python packages are available from PyPI
 (https://pypi.python.org/pypi).
+
+* At least Python 3.9
+
+* Package management:
+
+For managing the installation of NICOS and its dependencies, uv should be
+installed (available from
+https://docs.astral.sh/uv/getting-started/installation/).
+
+You can also use uv to manage the installed Python version(s). See uv's
+documentation for details: https://docs.astral.sh/uv/
 
 * NICOS specific Python packages (available from http://forge.frm2.tum.de/simple):
 
@@ -75,27 +95,56 @@ If not mentioned otherwise, Python packages are available from PyPI
   - pyreadline (optional, for the console to work)
   - colorama (optional, for colored console output)
 
-Detailed version requirements can always be found in the requirements.txt
+Detailed version requirements can always be found in the pyproject.toml
 file in the root of the source tree.
 
-If not supplied by the distribution (see below), most dependencies (except
-GR) can be installed from the Python package repository::
 
-  pip install -r requirements.txt
+.. _inst_uv:
 
-Development and documentation build dependencies can be installed with::
+Installing via ``uv``
+---------------------
 
-  pip install -r requirements-dev.txt
+The NICOS package, its dependencies and even Python itself can be installed via
+the uv management tool::
 
-pip can be obtained from https://pip.pypa.io/en/stable/
+     uv sync --all-packages
 
-For Debian/Ubuntu::
+This will create a virtual environment inside the source repository (./.venv)
+and download and set up (if needed) a Python interpreter. Into the virtual
+environment, uv installs all needed dependencies and all NICOS sub-packages.
 
-  apt-get install python3-pip
+It is possible that some of the dependencies require a build step: Should you
+receive any error messages during this stage, please refer to the section below
+on how to install any necessary native libraries on your platform.
+
+You can install specific sub-packages by explicitly selecting them instead::
+
+     uv sync --package nicos-demo
+
+If you would like to use optional components, you can select them via their
+respective group using the `--extra` argument. For the GUI and optional groups,
+for example, you can specify::
+
+     uv sync --extra gui --extra opt
+
+Other extras are defined in the pyproject.toml file in the root of the
+repository.
+
+By default, uv installs the NICOS packages as "editable" meaning that
+the installed packages reflect any modifications of the source code inside the repository. 
 
 
-Packages to install for common distributions
---------------------------------------------
+Instructions for installing uv be found at
+https://docs.astral.sh/uv/getting-started/installation/
+
+.. _inst_native:
+
+Native packages to install for common distributions
+---------------------------------------------------
+
+While uv will install all necessary Python packages, some require native
+libraries to be present on the system. These can be installed via the operating
+system's package manager.
 
 GR runtime packages (`gr` and `python-gr`) are available in the repositories
 linked at:
@@ -115,42 +164,23 @@ where 'distro' stands for:
      - jammy (Ubuntu 22.04)
      - bullseye (Debian 11)
      - bookworm (Debian 12)
+     - trixie (Debian 13)
 
 * Basic system::
 
-     apt-get install python3-{dev,zmq,numpy,scipy,psutil,rsa,systemd,tomlkit} gnuplot
-     apt-get install python3-{keyring,keyrings.alt,html2text}
-     apt-get install python3-{lttb,nicos-pyctl,nicos-quickyaml}
+     apt-get install git build-essential python3-dev pkg-config
 
 * Optional components::
 
-     apt-get install python3-{ldap3,docutils,serial,matplotlib,astropy,h5py,markdown,opencv,pika,tz}
-     apt-get install frappy-core
-     apt-get install python3-{kafka,confluent-kafka,pyepics}
+     apt-get install libsystemd-dev frappy-core
 
 * GUI and status monitor::
 
-     apt-get install python3-{pyqt5,pyqt5.qsci,pyqt5.qtwebengine,gr}
+     apt-get install qtbase5-dev qtwebengine5-dev
      apt-get install dvipng texlive-{latex-extra,fonts-recommended} cm-super
-
-* Development and documentation build::
-
-     apt-get install python3-{sip-dev,pytest,pytest-cov,pytest-timeout,coverage}
-     apt-get install python3-{sphinx,sphinx-rtd-theme}
-     apt-get install python3-pyqt5-{dev,dev-tools}
 
 * GR library repository
 
      To add the GR repository the gpg and curl tools are needed
 
      apt-get install gpg curl
-
-
-Debian 11/12 (Bullseye/Bookworm)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-An additional plugin for pytest is required (which was formerly included).
-
-* Development and documentation build::
-
-     apt-get install python3-pytest-timeout

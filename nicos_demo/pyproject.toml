@@ -4,17 +4,7 @@ description = "NICOS Customizations and Extensions for DEMO"
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-    "nicos",
-]
-
-[project.optional-dependencies]
-gui = [
-    "nicos[gui]"
-]
-
-[dependency-groups]
-dev = [
-    "nicos[dev]"
+    "nicos[gui]",
 ]
 
 [tool.uv.sources]
