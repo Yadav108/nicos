@@ -11,4 +11,4 @@ export TZ=Europe/Berlin
 echo $PWD
 
 source .venv/bin/activate
-pytest -v
+uv run -- pytest -v

@@ -7,7 +7,7 @@ PYFILESCHANGED=$(changedfiles --py)
 source .venv/bin/activate
 if [[ -n "$PYFILESCHANGED" ]] ; then
     set -o pipefail
-    pylint --rcfile=./pylintrc $PYFILESCHANGED | tee pylint_all.txt
+    uv run -- pylint --rcfile=./pylintrc $PYFILESCHANGED | tee pylint_all.txt
     res=$?
     set +o pipefail
 else

@@ -58,6 +58,7 @@ this.pipissues = []
 
 def defaultContainerArgs = '-v /home/git:/home/git -v uvcache:/uv-cache'
 
+def UV_LINK_MODE="copy";
 
 def checkoutSource() {
     echo(GERRIT_PROJECT)
