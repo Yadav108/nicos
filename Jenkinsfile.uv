@@ -75,7 +75,7 @@ def publishGerrit(name, value) {
 
 def refreshVenv(info="" , checkupdates=false) {
     try {
-        sh "uv sync --all-extras --all-groups --all-packages -v 2>&1 | tee uv-${info}.log"
+        sh "uv sync --all-extras --all-groups --all-packages 2>&1 | tee uv-${info}.log"
     } catch (all) {
         echo "Could not run uv sync, let's hope the image has all dependencies"
     }
