@@ -2,7 +2,7 @@ Quickstart
 ----------
 
 * :ref:`Install native dependencies <inst_native>`: For Debian-based systems, this would be ``apt update && apt install curl git build-essential python3-dev pkg-config qtbase5-dev qtwebengine5-dev libsystemd-dev``
-* Clone the repository: ``git clone ssh://forge.frm2.tum.de:29418/frm2/nicos/nicos``
+* Clone the repository: ``git clone https://forge.frm2.tum.de/review/frm2/nicos/nicos``
 * :ref:`Install uv <inst_uv>`: ``curl -LsSf https://astral.sh/uv/install.sh | sh``
 * :ref:`Run the demonstration setup <inst_demo>`: ``uv run --extra gui nicos-demo``
 
