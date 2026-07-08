@@ -32,7 +32,7 @@ check:
 	$(PYTHON) tools/check-setups $(CHECK_DIRS)
 
 setupcheck:
-	@$(PYTHON) tools/check-setups -s $(shell find . -mindepth 3 -type d -name setups | grep -v '\/test/') $(shell find . -name guiconfig.py)
+	@$(PYTHON) tools/check-setups -s $(shell find . -mindepth 3 -type d -name setups | grep -v /test/) $(shell find . -name guiconfig.py)
 
 T =
 
@@ -60,6 +60,12 @@ manualrelease: test release
 release:
 	cd doc; rm -rf build/html; ${MAKE} html
 	$(UV) build
+
+codespell:
+	codespell .
+
+fixups:
+	sg scan -c tools/fixups/config
 
 help:
 	@echo "Development targets:"

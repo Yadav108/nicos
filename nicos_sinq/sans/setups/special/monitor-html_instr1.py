@@ -2,7 +2,7 @@ description = 'setup for the HTML status monitor'
 group = 'special'
 
 
-_nvscolumn = Row(
+_nvscolumn = Column(
     Block(
         'Selector', [
             BlockRow(
@@ -39,7 +39,7 @@ _nvscolumn = Row(
 devices = dict(
     Monitor = device('nicos.services.monitor.html.Monitor',
         title = '',
-	filename = '/home/sans/data/html/instr1.html',
+        filename = '/home/status/instr1.html',
         interval = 10,
         loglevel = 'info',
         cache = 'localhost',

@@ -233,7 +233,7 @@ def practical_SC2(wl_min=0.0, wl_max=6.0, D=22.8, disk2_pos=3,
         a nested dictionary with different keys. The outer dictionary contains,
         as keys, the opening and closing times of SC2 disks (in seconds) for
         the 'default' configuration (times which are actually not needed but
-        are neverthless provided for backwards compatibility reasons) and the
+        are nevertheless provided for backwards compatibility reasons) and the
         various configurations as keys ('default', 'default_full_open', etc.).
         Each of these latter keys corresponds to a dictionary with the
         following subkeys:
@@ -257,7 +257,7 @@ def practical_SC2(wl_min=0.0, wl_max=6.0, D=22.8, disk2_pos=3,
         'resolution':       wavelength resolution, NOT in percentage (float)
         'disk2_pos':        disk2 position. This parameter is basically
                             copied by the input data
-        'wl_min_realised':  actual minimum wavelength trasmitted by the
+        'wl_min_realised':  actual minimum wavelength transmitted by the
                             configuration, in AA (float)
     """
     d_MCo = chopper_pos[disk2_pos]  # distance of disk2 from disk1
@@ -416,7 +416,7 @@ def chopper_parasitic(res, wl_start=25.0, wl_stop=95.0, wl_step=0.1,
 
     This is particularly useful for verifying the presence of any parasitic
     bands transmitted. The routine finds the parasitic ranges with a
-    brute-force appproach, which is time-consuming. If the only interest
+    brute-force approach, which is time-consuming. If the only interest
     is to know whether a certain configuration produces parasitic neutrons or
     not, the routine chopper_parasitic_bool is recommended
 
@@ -501,7 +501,7 @@ def chopper_parasitic(res, wl_start=25.0, wl_stop=95.0, wl_step=0.1,
     # Array containing the phases from disk2 to disk6, in deg
     phase_arr = res['angles'][1:6]
 
-    # Brings all the phases inside the range [0, 360[
+    # Brings all the phases inside the range [0, 360]
     if (phase_arr[3] is None) and (phase_arr[4] is None):
         phase_arr[0:3] = np.mod(phase_arr[0:3], 360.0)
     else:
@@ -666,7 +666,7 @@ def chopper_parasitic_bool(res, wl_start=25.0, wl_stop=95.0, wl_step=0.1,
 
     Output:
                             In output a boolean value is returned specifying
-                            whether parasitic wavelengths are trasmitted
+                            whether parasitic wavelengths are transmitted
                             (True) or not (False)
     """
     # The subroutine works mostly like chopper_parasitic
@@ -824,7 +824,7 @@ def adjust_parasitic_SC1(res, wl_start=25.0, wl_stop=95.0, wl_step=0.1,
     # the phases of SC1 pair define the wished wavelength band (therefore
     # behaving like SC2). If this configuration is "clean", in the sense that
     # it does not transmit parasitic neutrons, the two phases of SC1 are
-    # "relaxed" (i.e. SC1 is opened as much as possbile) until a parasitic
+    # "relaxed" (i.e. SC1 is opened as much as possible) until a parasitic
     # band is found, using a dichotomic approach
 
     # we create a temp variable res_bis with which we operate
@@ -871,7 +871,7 @@ def adjust_parasitic_SC1(res, wl_start=25.0, wl_stop=95.0, wl_step=0.1,
 def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                    gap=0.1, delay=0.0, SC2_mode='default',
                    SC2_full_open=240.0, suppress_parasitic=True,
-                   wl_stop=95.0, interface=True):
+                   wl_stop=95.0):
     """Calculate the full chopper configuration.
 
     Input:
@@ -939,11 +939,6 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                             for parasitic neutrons, in AA. This value has
                             effect only if suppress_parasitic = True
                             (float)
-        interface:          THIS PARAMETER IS NO LONGER USED BUT IS KEPT
-                            HERE JUST IN CASE. Originally it was used to
-                            force the subroutine to return a dictionary
-                            which is consistent with other subroutines
-                            existing in NICOS
 
     Output:
 
@@ -958,7 +953,7 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                             have to be intended as virtual values (int)
         'D':                distance between disk1 and detector,
                             in meters (float)
-        'wl_min':           the minium wavelength transmitted, in AA (float)
+        'wl_min':           the minimum wavelength transmitted, in AA (float)
         'wl_max':           the maximum wavelength transmitted, in AA (float)
 
         In case no working configurations can be found, all the output
@@ -1020,8 +1015,6 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
 
     angles = [0.0, 0.0, angle_SCc, angle_SCo, angle_SC2[0], angle_SC2[1]]
 
-    # The proper dictionary (cut if interface is True) is managed at the end of
-    # this routine
     res = {'freq':           freq,
            'rpm':            rpm,
            'angles':         angles,
@@ -1036,8 +1029,6 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
            'D':              D,
            'SC2_mode':       SC2_mode,
            }
-    if SC2_mode is not None:
-        res['SC2_open_angle'] = angles[4] - angles[5]
 
     # The routine checks if the configuration found produces frame overlap.
     # This is in particular critical if 'default_full_open' is chosen, since
@@ -1046,9 +1037,8 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
     # inconvenience, since, when the 'default' needs a SC2 opening larger than
     # the maximum value, practical_SC2 replaces it with the 'default_full_open'
 
-    if ((SC2_mode == 'default_full_open') or (SC2_mode == 'default')):
-        if (overlap > 0.0):
-            return None, 6 * [None], None, None, None, None
+    if SC2_mode in {'default_full_open', 'default'} and overlap > 0.0:
+        return None, 6 * [None], None, None, None, None
 
     # Before to continue, set the flag for virtual6_mode
     virtual6_mode = (disk2_pos == 6)
@@ -1072,7 +1062,7 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
     #     configuration.
     # If no parasitic neutrons are found, then this new configuration is
     # returned
-    # If parasitic neutrons are still present, no confguration is returned
+    # If parasitic neutrons are still present, no configuration is returned
     #
     # If disk_pos < 6 (i.e. from 1 to 5) then:
     #   - the phases of disks 3 and 4 are adjusted with an iterative procedure
@@ -1150,7 +1140,7 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                     parasitic_vl * (d_SCc - chopper_pos[res['disk2_Pos']])
 
                 # Since the phase of disk2 has been moved, we have to make sure
-                # the wl_max is really trasmitted from the new configuration.
+                # the wl_max is really transmitted from the new configuration.
                 # At this aim, let us evaluate the phase value of a neutron
                 # with wavelength wl_max (and velocity vl_min) when it is at
                 # the new disk2_pos. The equation to be used is
@@ -1174,7 +1164,7 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                 # If this phase is smaller than the value phase_2 we have
                 # previously evaluated, then this wavelength can not be
                 # provided and we have to evaluate the maximum possible
-                # trasnmittable wavelength
+                # transmittable wavelength
 
                 vl_min = h_m / wl_max
                 phase_at_disk2pos = 360.0 * (1.0 - freq * (
@@ -1182,7 +1172,7 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
 
                 if phase_at_disk2pos < res['angles'][1]:
                     # The wl_max can not be provided. We evaluate the new value
-                    # for wl_max, by imposing thet the trajectory of the
+                    # for wl_max, by imposing that the trajectory of the
                     # neutron goes through phase_2 and (phase_5 + 360) at
                     # d = d_MCo and d = d_SC2, respectively
                     new_vl_max = (d_SC2 - chopper_pos[res['disk2_Pos']]) / \
@@ -1226,24 +1216,14 @@ def chopper_config(wl_min=2.2, wl_max=21.0, D=22.8, disk2_pos=3,
                wl_stop=wl_stop):
                 return None, 6 * [None], None, None, None, None
 
-        else:
+        elif disk2_pos == 6:
             # parasitic wavelengths have not been found. If this happens for
             # disk2_Pos = 6, this means that virtual_6 may be achieved for
             # every disk2_pos value
 
-            if (disk2_pos == 6):
-                # Sets back the old values for disk2_pos and its phase
-                res['disk2_Pos'] = 6
-                res['angles'][1] = 0.0
-
-    if interface:  # Removes the keys originally not expected from Jens
-        res.pop('freq', None)
-        res.pop('delay_time', None)
-        res.pop('delay_angle', None)
-        res.pop('SC1_open_angle', None)
-        res.pop('SC1_phase', None)
-        res.pop('SC2_phase', None)
-        res.pop('SC2_mode', None)
+            # Sets back the old values for disk2_pos and its phase
+            res['disk2_Pos'] = 6
+            res['angles'][1] = 0.0
 
     # Brings the angles in the range [0, 360[
     if (SC2_mode is not None):

@@ -30,7 +30,7 @@ from nicos.utils.loggers import NicosLogger
 class RabbitProducer:
     HEADER_KEYS = {'proposal', 'subject', 'note', 'loglevel', 'attachment',
                    'file', 'line_count', 'img_rows', 'eln_enabled', 'exp_title',
-                   'grouping', 'timestamp'}
+                   'users', 'localcontact', 'grouping', 'timestamp'}
 
     def __init__(self, url, port, virtual_host,
                  username, password, static_queue):
@@ -58,12 +58,13 @@ class RabbitProducer:
         if not self._conn or self._conn.is_closed:
             self._conn = pika.BlockingConnection(self._params)
             self._channel = self._conn.channel()
+            self._channel.confirm_delivery()
 
     def _produce(self, headers, message):
-        self._channel.queue_declare(queue=self.queue, durable=True)
         self._channel.basic_publish(exchange='',
                                     routing_key=self.queue,
                                     body=message,
+                                    mandatory=True,
                                     properties=pika.BasicProperties(
                                         headers=headers,
                                         delivery_mode=

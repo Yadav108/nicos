@@ -215,7 +215,7 @@ class NicosMetaWriterMixin:
             for devname, val in list(self.dataset.values.items()):
                 device = session.getDevice(devname)
                 if (devname, 'value') in metainfo:
-                    # re-use the category
+                    # reuse the category
                     category = metainfo[(devname, 'value')].category
                 else:
                     category = 'result'
@@ -255,8 +255,9 @@ class NicosMetaWriterMixin:
         # to ease interpreting the data...
         # note: arraydesc exists only for ImageSinks
         if hasattr(self, '_arraydesc'):
-            wrapper.write('\n%r' % self._arraydesc)
-        wrapper.write('\n')
+            wrapper.write('\nArrayDesc(%r, %r, %r, %r)\n' % (
+                self._arraydesc.name, self._arraydesc.shape,
+                self._arraydesc.dtype, self._arraydesc.dimnames))
         wrapper.detach()
 
 

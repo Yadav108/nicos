@@ -17,9 +17,19 @@ main_window = tabbed(
                     panel('nicos.clients.gui.panels.errors.ErrorPanel')),
             ),
         ),
-        ('Experiment Info', panel('nicos.clients.gui.panels.expinfo.ExpInfoPanel', dockpos='left')),
+        ('Experiment Info',
+            panel('nicos.clients.gui.panels.expinfo.ExpInfoPanel',
+                  dockpos='left',
+                  sample_panel=panel('nicos_mlz.j_nse.gui.setup_panel.JNSESamplePanel'))),
         ('NICOS devices',
-            panel('nicos.clients.gui.panels.devices.DevicesPanel', icons=True, dockpos='right')),
+            panel(
+                'nicos.clients.gui.panels.devices.DevicesPanel',
+                icons=True,
+                dockpos='right',
+                param_display={
+                    f'pow{i:02d}': ['voltage', 'label'] for i in range(1, 39)
+                },
+            )),
     )),
     ('Script Editor',
         vsplit(

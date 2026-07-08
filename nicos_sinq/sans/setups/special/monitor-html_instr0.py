@@ -1,7 +1,7 @@
 description = 'setup for the HTML status monitor'
 group = 'special'
 
-_sans1column = Row(
+_sans1column = Column(
     Block(
         'SANS-1 Status', [
             BlockRow(
@@ -50,7 +50,7 @@ _sans1column = Row(
 devices = dict(
     Monitor = device('nicos.services.monitor.html.Monitor',
         title = '',
-        filename = '/home/sans/data/html/status.html',
+        filename = '/home/status/status.html',
         interval = 10,
         loglevel = 'info',
         cache = 'localhost',

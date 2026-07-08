@@ -42,6 +42,7 @@ from nicos.utils import KEYEXPR_NS, TB_CAUSE_MSG, Repeater, allDays, \
     parseConnectionString, parseDuration, parseKeyExpression, \
     readFileCounter, readonlydict, readonlylist, safeName, safeWriteFile, \
     squeeze, tcpSocket, timedRetryOnExcept, tupelize, updateFileCounter
+from nicos.utils.user import combineUsers, splitUsers
 from nicos.utils.timer import Timer
 
 
@@ -63,11 +64,11 @@ def test_readonly_objects():
     d = readonlydict({'a': 1, 'b': 2})
     pytest.raises(TypeError, d.update, {})
 
-    # pickle Protocoll 0
+    # pickle Protocol 0
     unpickled = pickle.loads(pickle.dumps(d))
     assert isinstance(unpickled, readonlydict)
     assert len(unpickled) == 2
-    # pickle Protocoll 2
+    # pickle Protocol 2
     unpickled = pickle.loads(pickle.dumps(d, 2))
     assert isinstance(unpickled, readonlydict)
     assert len(unpickled) == 2
@@ -75,11 +76,11 @@ def test_readonly_objects():
     lst = readonlylist([1, 2, 3])
     pytest.raises(TypeError, lst.append, 4)
 
-    # pickle Protocoll 0
+    # pickle Protocol 0
     unpickled = pickle.loads(pickle.dumps(lst))
     assert isinstance(unpickled, readonlylist)
     assert len(unpickled) == 3
-    # pickle Protocoll 2
+    # pickle Protocol 2
     unpickled = pickle.loads(pickle.dumps(lst, 2))
     assert isinstance(unpickled, readonlylist)
     assert len(unpickled) == 3
@@ -367,10 +368,38 @@ def test_check_setup_spec():
 
 def test_parse_key_expression():
     assert parseKeyExpression('dev.key')[0] == 'dev/key'
+    assert parseKeyExpression('dev/key')[0] == 'dev/key'
     assert parseKeyExpression('dev.key', normalize=lambda s: s)[0] == \
         'dev.key/value'
     assert parseKeyExpression('dev.key', False, normalize=lambda s: s)[0] == \
         'dev.key'
+
+    key, expr, _ =  parseKeyExpression('dev.key[0]')
+    assert key == 'dev/key'
+    assert eval(expr, {}, {'x': [0]}) == 0
+
+    key, expr, _ =  parseKeyExpression('dev.key[1]')
+    assert key == 'dev/key'
+    assert eval(expr, {}, {'x': [0, 1]}) == 1
+
+    key, expr, _ = parseKeyExpression('dev/key[0]')
+    assert key == 'dev/key'
+    assert eval(expr, {}, {'x': [0]}) == 0
+
+    key, expr, _ = parseKeyExpression('dev/key[1]')
+    assert key == 'dev/key'
+    assert eval(expr, {}, {'x': [0, 1]}) == 1
+
+    key, expr, _ = parseKeyExpression('dev/key[c]')
+    assert key == 'dev/key'
+    assert eval(expr, {}, {'c': 0, 'x': [0, 1, 2]}) == 0
+    assert eval(expr, {}, {'c': 1, 'x': [0, 1, 2]}) == 1
+    assert eval(expr, {}, {'c': 2, 'x': [0, 1, 2]}) == 2
+
+    key, expr, _ = parseKeyExpression('a/5[1]')
+    assert key == 'a/value'
+    key, expr, _ = parseKeyExpression('a/(b+c)[1]')
+    assert key == 'a/value'
 
     key, expr, _ = parseKeyExpression('dev + 1')
     assert key == 'dev/value'
@@ -614,3 +643,51 @@ def test_expandTemplateRecursion(expr, expected, defaulted_keys, missing_keys):
     assert expected == res
     assert [e['key'] for e in defaulted] == defaulted_keys
     assert [e['key'] for e in missing] == missing_keys
+
+
+def test_split_users():
+    assert splitUsers('') == [{'name': ''}]
+    assert splitUsers('Nico Suser') == [{'name': 'Nico Suser'}]
+    assert splitUsers('Nico Suser <nico@suser.org>') == [
+        {'email': 'nico@suser.org', 'name': 'Nico Suser'}
+    ]
+    assert splitUsers('Nico Suser <nico@suser.org> (Home)') == [
+        {'affiliation': 'Home', 'email': 'nico@suser.org', 'name': 'Nico Suser'},
+    ]
+    assert splitUsers('Nico Suser<nico@suser.org>(Home)') == [
+        {'affiliation': 'Home', 'email': 'nico@suser.org', 'name': 'Nico Suser'},
+    ]
+    assert splitUsers('Nico Suser (Home)') == [
+        {'affiliation': 'Home', 'name': 'Nico Suser'},
+    ]
+    assert splitUsers('Nico Suser <nico@suser.org> (Home);') == [
+        {'affiliation': 'Home', 'email': 'nico@suser.org', 'name': 'Nico Suser'},
+        {'name': ''},
+    ]
+    assert splitUsers('Nico Suser <nico@suser.org> (Home); A. User ') == [
+        {'affiliation': 'Home', 'email': 'nico@suser.org', 'name': 'Nico Suser'},
+        {'name': 'A. User'},
+    ]
+    assert splitUsers('Nico Suser <nico@suser.org> (Home);A. User') == [
+        {'affiliation': 'Home', 'email': 'nico@suser.org', 'name': 'Nico Suser'},
+        {'name': 'A. User'},
+    ]
+
+
+def test_combine_users():
+    assert combineUsers([]) == ''
+    assert combineUsers([{'name': 'N. User'}]) == 'N. User'
+    assert combineUsers([
+        {'name': 'N. User', 'email': 'nico@suser.org'}
+    ]) == 'N. User <nico@suser.org>'
+    assert combineUsers([
+        {'affiliation': 'Home', 'name': 'N. User', 'email': 'nico@suser.org'}
+    ]) == 'N. User <nico@suser.org> (Home)'
+    assert combineUsers([
+        {'affiliation': 'Home', 'name': 'N. User', 'email': 'nico@suser.org'},
+        {'name': ''},
+    ]) == 'N. User <nico@suser.org> (Home); '
+    assert combineUsers([
+        {'affiliation': 'Home', 'name': 'N. User', 'email': 'nico@suser.org'},
+        {'name': 'A. User'},
+    ]) == 'N. User <nico@suser.org> (Home); A. User'

@@ -25,6 +25,7 @@
 
 import pytest
 
+from nicos.core import status
 from nicos.core.errors import InvalidValueError, LimitError, MoveError
 
 session_setup = 'pgaa'
@@ -85,12 +86,14 @@ class TestSampleChanger:
         push.maw('down')
         yield
         motor.curvalue = 1
+        motor._setROParam('target', 1)
+        sc._attached_motor.curstatus = status.OK, ''
         push.maw('down')
 
     def test_move(self, session):
         sc = session.getDevice('sc')
         assert sc.read(0) == 1
-        assert sc._attached_push.read() == 'down'
+        assert sc._attached_push.read(0) == 'down'
         sc.maw(2)
         assert sc.read(0) == 2
         # Check if not move if already at target
@@ -107,7 +110,21 @@ class TestSampleChanger:
         push = session.getDevice('push')
         push.maw('up')
         assert push.read(0) == 'up'
-        sc._attached_motor.maw(1.5)
+
+        # try to move into a non valid position
+        pytest.raises(LimitError, sc._attached_motor.maw, 1.5)
+
+        # put motor into a not valid position and try to push sample down
+        sc._attached_motor.curvalue = 1.5
+        sc._attached_motor._setROParam('target', 1.5)
+        pytest.raises(LimitError, push.move, 'down')
+
+        # Simulate a "not at target" situation
+        sc._attached_motor.curvalue = 2
+        pytest.raises(LimitError, push.move, 'down')
+
+        # Simulate a moving state to enforce an error during pushing down
+        sc._attached_motor.curstatus = status.BUSY, 'moving'
         pytest.raises(LimitError, push.move, 'down')
 
     def test_block_motor(self, session):

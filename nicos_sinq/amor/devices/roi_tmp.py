@@ -28,7 +28,7 @@ from nicos_sinq.devices.just_bin_it import JustBinItImage
 
 class CutROI(RectROIChannel):
     """
-    A class which cuts a ROI out of another image for a single counter, roi is user changable.
+    A class which cuts a ROI out of another image for a single counter, roi is user changeable.
     """
 
     attached_devices = {
@@ -39,9 +39,9 @@ class CutROI(RectROIChannel):
         raw_data = self._attached_raw_image.doReadArray(None)
         if any(self.roi):
             x, y, w, h = self.roi
-            return [float(raw_data[y:y+h, x:x+w].sum())]
-        return [0.]
+            return [int(raw_data[y:y+h, x:x+w].sum())]
+        return [0]
 
 
     def valueInfo(self):
-        return Value(self.name, type='counter', unit=self.unit),
+        return Value(self.name, type='counter', unit=self.unit, fmtstr='%d'),

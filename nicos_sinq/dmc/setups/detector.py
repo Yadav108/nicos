@@ -19,7 +19,6 @@ devices = dict(
         description = 'Detector angle (s2t)',
         motorpv = 'SQ:DMC:turboPmac1:A4',
         errormsgpv = 'SQ:DMC:turboPmac1:A4-MsgTxt',
-        can_disable = True,
     ),
 
     # Detector Technical Measures
@@ -93,6 +92,7 @@ devices = dict(
         hist_topic = configdata('config.JUST_BIN_IT_HISTOGRAMS_TOPIC'),
         data_topic = configdata('config.JUST_BIN_IT_DATA_TOPIC'),
         command_topic = configdata('config.JUST_BIN_IT_COMMANDS_TOPIC'),
+        response_topic = configdata('config.JUST_BIN_IT_RESPONSES_TOPIC'),
         brokers = configdata('config.KAFKA_BROKERS'),
         unit = 'evts',
         hist_type = '2-D DET',

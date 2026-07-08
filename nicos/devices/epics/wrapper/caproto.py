@@ -84,6 +84,7 @@ STATUS_TO_MESSAGE = {
 # Same context can be shared across all devices.
 _Context = Context()
 
+
 @hiddenusercommand
 @helparglist('name[, timeout]')
 def caget(name, timeout=3.0):
@@ -148,7 +149,7 @@ class CaprotoWrapper:
         try:
             # response is a ReadResponse objects with the fields:
             # - data: a scalar or an array depending on the record type
-            # - metada: Control metdata such as limits, units, etc.
+            # - metada: Control metadata such as limits, units, etc.
             # - status: Record status
             # - severity: Error severity
             # - timestamp: Read timestamp
@@ -198,7 +199,10 @@ class CaprotoWrapper:
         # If the value is a scalar, return it, otherwise return the array.
         # Explicit None check is needed here because scalar could be a zero!
         if scalar is not None:
-            return scalar
+            # Unpack the numpy type, so that the cache isn't filled with
+            # pickled objects
+            # Apparently, this is faster than using the .item() method.
+            return tolist() if (tolist := getattr(scalar, 'tolist', None)) else scalar
         return response.data
 
     def put_pv_value(self, pvname, value, timeout=None):
@@ -210,7 +214,8 @@ class CaprotoWrapper:
         # `ẁait = False`, otherwise `ẁait = True`.
         wait = timeout is not None
 
-        if pvname in self._choices:
+        # Accept the raw value too, not just the enum string.
+        if isinstance(value, str) and pvname in self._choices:
             value = self._choices[pvname].index(value)
         try:
             self._pvs[pvname].write(value, wait=wait, timeout=timeout)

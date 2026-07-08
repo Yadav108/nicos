@@ -28,13 +28,15 @@ from nicos.core import Param, status
 from nicos.core.errors import UsageError
 from nicos.core.params import Override, none_or, oneof, pvname
 from nicos.devices.epics.motor import EpicsMotor as CoreEpicsMotor
+from nicos.devices.epics.status import EPICS_TIMEOUT_MSG
 from nicos_sinq.devices.dynamic_userlimits import DynamicUserlimits
+
 
 class SinqMotor(DynamicUserlimits, CoreEpicsMotor):
 
     parameters = {
         'can_disable': Param('Whether the motor can be enabled/disabled using '
-                             'a PV or not.', type=bool, mandatory=False,
+                             'a PV or not', type=bool, mandatory=False,
                              settable=False, userparam=False, volatile=True),
         'encoder_type': Param('Encoder type', default=None, settable=False,
                               type=none_or(oneof('absolute', 'incremental')),
@@ -59,6 +61,7 @@ class SinqMotor(DynamicUserlimits, CoreEpicsMotor):
         'encoder_type': ':EncoderType',
         'reseterrorpv': ':Reset',
         'errormsgpv': ':ErrorMessage',
+        'fixifnothomed': ':FixIfNotHomed',
     }
 
     # Maximum allowed delay for enabling / disabling a motor before an error
@@ -83,12 +86,25 @@ class SinqMotor(DynamicUserlimits, CoreEpicsMotor):
         params.add('errormsgpv')
         return params
 
+    @property
+    def homed(self):
+        """
+        Returns whether the motor has been homed before
+        """
+        status_bits = format(int(self._get_pv('status')), '016b')
+        return int(status_bits[1])
+
     def doInit(self, mode):
         DynamicUserlimits.doInit(self, mode)
         CoreEpicsMotor.doInit(self, mode)
 
     def doStatus(self, maxage=0):
         (stat, msg) = CoreEpicsMotor.doStatus(self, maxage)
+
+        # This is not ideal, but timeout is an Error that needs to be
+        # taken into account earlier than other errors.
+        if msg == EPICS_TIMEOUT_MSG:
+            return stat, msg
 
         # Ignore errors if the motor is disconnected
         if not self.connected:
@@ -100,6 +116,12 @@ class SinqMotor(DynamicUserlimits, CoreEpicsMotor):
             if stat == status.ERROR:
                 return (stat, 'Motor is disabled - ' + msg)
             return status.DISABLED, 'Motor is disabled'
+
+        # If there is no error, but the motor is not referenced, inform the user
+        # that the motor needs to be referenced and the reported position value
+        # cannot be trusted.
+        if self.encoder_type == 'incremental' and stat == status.OK and self._has_been_homed() == 0:
+            msg = 'Motor needs to be referenced.'
 
         return (stat, msg)
 
@@ -195,6 +217,11 @@ class SinqMotor(DynamicUserlimits, CoreEpicsMotor):
         return self._get_pv('resolution')
 
     def doReference(self):
+        # Don't allow referencing while disabled
+        if not self.enabled:
+            raise UsageError('Referencing the motor while disabled is not '
+                             'possible, please enable before referencing.')
+
         if self.encoder_type == 'absolute':
             self.log.warning(
                 'This motor does not require homing - command ignored')

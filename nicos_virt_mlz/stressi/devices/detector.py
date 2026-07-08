@@ -62,6 +62,7 @@ class McStasSimulation(BaseSimulation):
 
     def _prepare_params(self):
         return [
+            # Slits in McStas defined as (-xprime, xprime, -yprime, yprime)
             'xprime=%s' % self._dev_value(self._attached_xprime, 2 * 1000),
             'yprime=%s' % self._dev_value(self._attached_yprime, 2 * 1000),
             'primeswitch=1',
@@ -117,6 +118,15 @@ class Image(McStasImage):
 
 
 class McStasCounter(BaseCounter):
+
+    parameters = {
+        'preselection': Param('Preset value for this channel', type=int,
+                              settable=True),
+    }
+
+    def setChannelPreset(self, name, value):
+        BaseCounter.setChannelPreset(self, name, value)
+        self.preselection = value
 
     def doRead(self, maxage=0):
         if self._mode == MASTER:

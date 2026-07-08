@@ -9,7 +9,9 @@ using setups please check :doc:`installconfig`.
 .. toctree::
    :maxdepth: 1
 
+   introduction
    commands
    userscripts
    gui/invocation
    ipython
+   stopping

@@ -31,8 +31,8 @@ from nicos.clients.gui.panels import Panel
 from nicos.clients.gui.utils import dialogFromUi, loadUi
 from nicos.guisupport.qt import QActionGroup, QDesktopServices, QDialog, \
     QFontDatabase, QInputDialog, QLineEdit, QMainWindow, QMenu, QPrintDialog, \
-    QPrinter, QPushButton, QTextDocument, QTextEdit, QTimer, QToolBar, \
-    QUrl, QWebEngineView, pyqtSlot
+    QPrinter, QPushButton, QTextDocument, QTextEdit, QTimer, QToolBar, QUrl, \
+    QWebEngineView, pyqtSlot
 
 if QWebEngineView is None:
     raise ImportError('Qt webview component is not available')
@@ -216,7 +216,7 @@ class ELogPanel(Panel):
         dlg.helpFrame.setVisible(False)
         if hasattr(dlg.viewer, 'setMarkdown'):
             dlg.editor.textChanged.connect(
-                lambda : dlg.viewer.setMarkdown(dlg.editor.toPlainText()))
+                lambda: dlg.viewer.setMarkdown(dlg.editor.toPlainText()))
         else:
             dlg.viewer.hide()
         dlg.mdLabel.linkActivated.connect(

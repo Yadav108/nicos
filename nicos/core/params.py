@@ -148,10 +148,15 @@ class Param:
         self.ext_desc = ext_desc
         self.classname = None  # filled by DeviceMeta
 
-        if internal and mandatory:
-            raise ProgrammingError("Ambiguous parameter settings detected. "
-                                   "'internal' and 'mandatory' must be used "
-                                   "exclusively.")
+        if mandatory:
+            if internal:
+                raise ProgrammingError("Ambiguous parameter settings detected. "
+                                       "'internal' and 'mandatory' must must " \
+                                       "not be 'True' at the same time.")
+            if volatile:
+                raise ProgrammingError("Ambiguous parameter settings detected. "
+                                       "'volatile' and 'mandatory' must must " \
+                                       "not be 'True' at the same time.")
 
         if userparam is None:  # implicit settings
             self.userparam = not self.internal
@@ -382,14 +387,14 @@ class Attach:
                                      (len(args), mindevs, aname, args))
         if len(args) > maxdevs:
             raise ConfigurationError(dev, 'too many devices (%d>%d) for %r in '
-                                          'configuration (specified=%r)' %
-                                          (len(args), maxdevs, aname, args))
+                                     'configuration (specified=%r)' %
+                                     (len(args), maxdevs, aname, args))
 
         if check_count(self.multiple, self.optional, len(args)):
             return args
         raise ConfigurationError(dev, 'wrong number of devices (%d) for %r in '
-                                      'configuration (specified=%r)' %
-                                      (len(args), aname, args))
+                                 'configuration (specified=%r)' %
+                                 (len(args), aname, args))
 
     def __repr__(self):
         s = 'Attach(%r, %s.%s' % (self.description,
@@ -712,13 +717,13 @@ class nonzero:
     def __init__(self, conv, default=None):
         self.__doc__ = 'Nonzero value of %s' % convdoc(conv)
         self.conv = fixup_conv(conv)
-        # inital check for default value
+        # initial check for default value
         try:
             default_ = (default or conv()) or 1
             self.default = conv(default_)
         except ValueError as exc:
             raise ValueError(f'{default} is no good default value for {conv}, '
-                              'please choose a valid nonzero value!') from exc
+                             'please choose a valid nonzero value!') from exc
 
     def __call__(self, val=None):
         if val is None:

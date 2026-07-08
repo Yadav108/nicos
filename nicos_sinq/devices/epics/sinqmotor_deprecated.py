@@ -32,12 +32,12 @@ class SinqMotor(CoreEpicsMotor):
 
     parameters = {
         'can_disable': Param('Whether the motor can be enabled/disabled using '
-                             'a PV or not.', type=bool, mandatory=False,
+                             'a PV or not', type=bool, mandatory=False,
                              settable=False, userparam=False, volatile=True),
         'encoder_type': Param('Encoder type', default=None, settable=False,
                               type=none_or(oneof('absolute', 'incremental')),
                               userparam=True, volatile=True),
-        'connected': Param('Whether the motor is connected or not.', type=bool,
+        'connected': Param('Whether the motor is connected or not', type=bool,
                            mandatory=False, settable=False, userparam=True,
                            volatile=True),
     }
@@ -171,9 +171,6 @@ class SinqMotor(CoreEpicsMotor):
         if not self.enabled:
             return False, 'Motor disabled'
         return True, ''
-
-    def doReadPrecision(self):
-        return self._get_pv('resolution')
 
     def doReference(self):
         if self.encoder_type == 'absolute':

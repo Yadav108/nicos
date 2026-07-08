@@ -121,7 +121,7 @@ _measurement = Column(
             Field(dev='ssw'),
         ),
         ],
-        setups = 'radial',
+        setups = 'secradial',
     ),
     Block('Tensile machine', [
         BlockRow(
@@ -136,13 +136,13 @@ _measurement = Column(
         ],
         setups = 'tensile*',
     ),
-    Block('Temperature', [
-        BlockRow(
-            Field(dev='T_bat_A'),
-        ),
-        ],
-        setups = 'mpfc01*',
-    ),
+    # Block('Temperature', [
+    #     BlockRow(
+    #         Field(dev='T_bat_A'),
+    #     ),
+    #     ],
+    #     setups = 'mpfc01*',
+    # ),
 )
 
 _eulerian = Column(

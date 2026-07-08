@@ -7,11 +7,13 @@ devices = dict(
         description = 'Sample omega motor',
         motorpv = f'{pvprefix}A3',
         errormsgpv = f'{pvprefix}A3-MsgTxt',
-        can_disable = True,
     ),
     a3 = device('nicos.core.device.DeviceAlias',
         description = 'Alias for sample rotation',
-        alias = 'a3s',
         devclass = 'nicos.core.device.Moveable'
     ),
 )
+
+alias_config = {
+    'a3': {'a3s': 100},
+}

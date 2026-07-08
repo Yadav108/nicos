@@ -37,10 +37,10 @@ class Lockinmeter(Measurable):
                           type=listof(oneof('X', 'Y', 'R', 'theta', 'Aux IN 1',
                                             'Aux IN 2', 'Aux IN 3', 'Aux IN 4', )),
                           settable=True, default=['R', 'theta'],),
-        'amplitude': Param('Sine Output Amplitude in Vrms. 0.004 ≤ x ≤5.000.',
+        'amplitude': Param(r'Sine Output Amplitude in Vrms. :math:`0.004 \le x \le 5.000`',
                            type=floatrange(0.004, 5.0), settable=True,
                            unit='V', default=5.0,),
-        'frequency': Param('Reference Frequency in Hz.',
+        'frequency': Param('Reference Frequency in Hz',
                            type=float, settable=True,
                            unit='Hz', default=50.5,),
         'unit': Param('Unit for voltage values',
@@ -87,7 +87,7 @@ class Lockinmeter(Measurable):
         self._writeParams()
         self._values = [0] * len(self.channels)
         self._currentChannel = 0
-        self._laststatus = (status.BUSY, 'measuring')
+        self._lastStatus = (status.BUSY, 'measuring')
         self._measureNext()
 
     def _writeParams(self):

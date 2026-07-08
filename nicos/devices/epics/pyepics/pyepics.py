@@ -348,7 +348,7 @@ class EpicsMoveable(EpicsDevice, Moveable):
                         type=pvname, mandatory=True, userparam=False),
         'writepv': Param('PV for writing device target',
                          type=pvname, mandatory=True, userparam=False),
-        'targetpv': Param('Optional target readback PV.',
+        'targetpv': Param('Optional target readback PV',
                           type=none_or(pvname), mandatory=False,
                           userparam=False)
     }
@@ -360,7 +360,7 @@ class EpicsMoveable(EpicsDevice, Moveable):
 
     def _get_pv_parameters(self):
         """
-        Overriden from EpicsDevice. If the targetpv parameter is specified,
+        Overridden from EpicsDevice. If the targetpv parameter is specified,
         the PV-object should be created accordingly. Otherwise, just return
         the mandatory pv_parameters.
         """

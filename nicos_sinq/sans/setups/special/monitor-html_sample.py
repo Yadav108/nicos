@@ -1,7 +1,7 @@
 description = 'setup for the HTML status monitor'
 group = 'special'
 
-_st1column = Row(
+_st1column = Column(
     Block(
         'Sample table', [
             BlockRow(
@@ -17,7 +17,7 @@ _st1column = Row(
     ),
 )
 
-_st2column = Row(
+_st2column = Column(
     Block(
         'Sample table', [
             BlockRow(
@@ -37,7 +37,7 @@ _st2column = Row(
 )
 
 
-_tempcolumn = Row(
+_tempcolumn = Column(
     Block(
         'Temperature', [
             BlockRow(
@@ -52,7 +52,7 @@ _tempcolumn = Row(
     ),
 )
 
-_Bfieldcolumn = Row(
+_Bfieldcolumn = Column(
     Block(
         'magnetic field', [
             BlockRow(
@@ -69,14 +69,14 @@ _Bfieldcolumn = Row(
 devices = dict(
     Monitor = device('nicos.services.monitor.html.Monitor',
         title = '',
-        filename = '/home/sans/data/html/sample.html',
+        filename = '/home/status/sample.html',
         interval = 10,
         loglevel = 'info',
         cache = 'localhost',
         prefix = 'nicos/',
         font = 'Droid Sans',
         valuefont = 'Droid Sans Moni',
-        fontsize = 12,
+        fontsize = 18,
         padding = 3,
         layout = [
             [_st1column, _st2column ],

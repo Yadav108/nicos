@@ -24,6 +24,10 @@ devices = dict(
         dvalue = 3.45,
         scatteringsense = -1,
         crystalside = -1,
+        # segment_width = 1,
+        # segment_height = 1,
+        segment_columns = 2,
+        segment_rows = 9,
     ),
 
     mfv_heusler_step = device('nicos_virt_mlz.panda.devices.stubs.MccMotor',
@@ -73,7 +77,6 @@ devices = dict(
         description = 'horizontal focus of heusler ana',
         motor = 'afh_heusler_step',
         dragerror = 5,
-        abslimits = (-179, 179),
         precision = 1,
         fmtstr = '%.1f',
         autoref = None,  # disable autoref since there is no refswitch

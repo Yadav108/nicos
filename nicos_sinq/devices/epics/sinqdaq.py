@@ -29,17 +29,18 @@ This replaces the following files:
     - nicos_sinq/devices/epics/scaler_record.py
 """
 
-import numpy as np
+import math
 
 from nicos import session
-from nicos.core import POLLER, SIMULATION, Attach, Moveable, Override, Param, \
-    Readable, Value, floatrange, intrange, none_or, nonzero, oneof, pvname, \
-    status
+from nicos.core import POLLER, SIMULATION, Attach, HasPrecision, Moveable, \
+    Override, Param, Readable, Value, floatrange, intrange, none_or, nonzero, \
+    oneof, pvname, status
 from nicos.core.constants import MASTER
 from nicos.core.errors import ConfigurationError, UsageError
 from nicos.core.mixins import CanDisable, HasLimits
 from nicos.devices.abstract import MappedMoveable
 from nicos.devices.epics import EpicsDevice
+from nicos.devices.epics.status import EPICS_TIMEOUT_MSG
 from nicos.devices.generic.detector import ActiveChannel, \
     CounterChannelMixin, Detector, PassiveChannel, TimerChannelMixin
 
@@ -86,36 +87,19 @@ class DAQEpicsDevice(EpicsDevice):
             return ':'.join([self.daqpvprefix, self._daqpvs[pvparam]])
         return EpicsDevice._get_pv_name(self, pvparam)
 
-    # TODO I am not sure if this is something I broke? or in general broken
-    # in the version of caproto we have?
-    # So I am temporarily overriding to fix this here
-    def _get_pv(self, pvparam, as_string=False):
-        value = EpicsDevice._get_pv(self, pvparam, as_string)
-        if isinstance(value, np.floating):
-            return float(value)
-        if isinstance(value, np.integer):
-            return int(value)
-        return value
-
-    # TODO I am overriding this due to the same problem
-    def value_change_callback(self, name, param, value, units, severity,
-                              message, **kwargs):
-        cache_key = self._get_cache_relation(param)
-        if cache_key and self._cache:
-            if isinstance(value, np.floating):
-                self._setROParam(cache_key, float(value))
-            elif isinstance(value, np.integer):
-                self._setROParam(cache_key, int(value))
-            else:
-                self._setROParam(cache_key, value)
-            if param == 'readpv':
-                self._setROParam('unit', units)
-
     def doRead(self, maxage=0):
         return self._get_pv('readpv')
 
     def doReadUnit(self):
         return self._epics_wrapper.get_units(self._param_to_pv['readpv'])
+
+    def _sev_status_map(self, pvname):
+        severity, msg = self.get_alarm_status(pvname)
+        if severity == status.UNKNOWN and msg == "LINK":
+            return severity, "No Connection to Detector Hardware"
+        if severity in [status.ERROR, status.WARN, status.UNKNOWN]:
+            return severity, msg
+        return status.OK, ''
 
 
 class DAQChannelEpicsDevice(DAQEpicsDevice):
@@ -203,6 +187,10 @@ class DAQChannel(DAQChannelEpicsDevice, CounterChannelMixin, PassiveChannel):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('readpv')
+            if severity != status.OK:
+                return severity, msg
+
             if self._get_pv('statuspv') or self.preparing:
                 return status.BUSY, ''
 
@@ -211,13 +199,21 @@ class DAQChannel(DAQChannelEpicsDevice, CounterChannelMixin, PassiveChannel):
             return status.OK, f'Rate: {rate:.2f} {rate_units}'
 
         except TimeoutError:
-            return status.ERROR, 'timeout reading rate'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def doReset(self):
         self.preparing = False
 
+    def doPause(self):
+        """
+        This channel cannot be paused, but that also means trying to pause it
+        cannot fail. Hence, we return True here so the doPause method of the
+        detector does not create a warning.
+        """
+        return True
 
-class DAQTime(DAQEpicsDevice, TimerChannelMixin, PassiveChannel):
+
+class DAQTime(DAQEpicsDevice, TimerChannelMixin, HasPrecision, PassiveChannel):
     """
     Retrieves the elapsed time from the configured `channel` of the
     configured SINQ DAQ System.
@@ -240,12 +236,14 @@ class DAQTime(DAQEpicsDevice, TimerChannelMixin, PassiveChannel):
     parameter_overrides = {
         'maxage': Override(userparam=False),
         'pollinterval': Override(userparam=False),
-        'fmtstr': Override(default='%.3f'),
+        'fmtstr': Override(default='%.2f'),
         'description': Override(mandatory=False, internal=True, prefercache=False,
                                 default=('The Elapsed Time measured during the '
                                          'current/most recent count')),
         'presetaliases': Override(mandatory=False, internal=False,
                                   settable=True, userparam=True),
+        'precision': Override(mandatory=False, internal=True,
+                              settable=False, userparam=True),
     }
 
     _daqpvs = {
@@ -273,15 +271,36 @@ class DAQTime(DAQEpicsDevice, TimerChannelMixin, PassiveChannel):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('readpv')
+            if severity != status.OK:
+                return severity, msg
+
             if self._get_pv('statuspv') or self.preparing:
                 return status.BUSY, ''
             return status.OK, ''
 
         except TimeoutError:
-            return status.ERROR, 'timeout reading elapsed time'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def doReset(self):
         self.preparing = False
+
+    def doPause(self):
+        """
+        This channel cannot be paused, but that also means trying to pause it
+        cannot fail. Hence, we return True here so the doPause method of the
+        detector does not create a warning.
+        """
+        return True
+
+    def doReadPrecision(self):
+        # In hardware, we have 2 decimal places of precision.
+        return math.nextafter(0.01, -math.inf)
+
+    def presetReached(self, name, value, maxage):
+        if name in self._presetmap:
+            return self.doIsAtTarget(value, self.read(maxage)[self._presetmap[name]])
+        return False
 
 
 class DAQPreset(DAQEpicsDevice, ActiveChannel):
@@ -492,7 +511,7 @@ class DAQPreset(DAQEpicsDevice, ActiveChannel):
 
     def valueInfo(self):
         if self.isTimePreset:
-            return (Value(self._attached_time_channel.name, unit=self.unit, fmtstr='%.3f'), )
+            return (Value(self._attached_time_channel.name, unit=self.unit, fmtstr=self._attached_time_channel.fmtstr), )
         return (Value(self.monitor_channel, unit=self.unit, fmtstr='%d'), )
 
     def doReadUnit(self):
@@ -550,7 +569,10 @@ class DAQPreset(DAQEpicsDevice, ActiveChannel):
             self.hardware_count = value
 
         self.unit = 'sec' if self.isTimePreset else 'cts'
-        self.fmtstr = '%.3f' if self.isTimePreset else '%d'
+        self.fmtstr = self._attached_time_channel.fmtstr if self.isTimePreset else '%d'
+
+        # Changing the preset changes the status string, so force an update
+        self.status(0)
 
     def doStop(self):
         self.started_count = False
@@ -576,6 +598,10 @@ class DAQPreset(DAQEpicsDevice, ActiveChannel):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('statuspv')
+            if severity != status.OK:
+                return severity, msg
+
             st_code = self._get_pv('statuspv')
 
             started_count = self.started_count
@@ -627,7 +653,7 @@ class DAQPreset(DAQEpicsDevice, ActiveChannel):
                 return status.ERROR, 'DAQ Error: %s' % self._get_pv('errormsgpv')
 
         except TimeoutError:
-            return status.ERROR, 'timeout getting DAQ Hardware status'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def doReset(self):
         self.started_count = False
@@ -761,13 +787,17 @@ class DAQMinThresholdChannel(CanDisable, DAQEpicsDevice, MappedMoveable):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('readpv')
+            if severity != status.OK:
+                return severity, msg
+
             if self.isEnabled():
                 if self.target != self.read():
                     return status.BUSY, ''
                 return status.OK, ''
             return status.DISABLED, ''
         except TimeoutError:
-            return status.ERROR, 'timeout reading configured channel'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def _get_status_parameters(self):
         # Otherwise takes a while to update
@@ -868,6 +898,10 @@ class DAQMinThreshold(DAQEpicsDevice, HasLimits, Moveable):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('readpv')
+            if severity != status.OK:
+                return severity, msg
+
             if self._attached_min_rate_channel.isEnabled():
                 channel_status, _ = self._attached_min_rate_channel.status()
                 if channel_status == status.BUSY or self.target != self.read():
@@ -876,7 +910,7 @@ class DAQMinThreshold(DAQEpicsDevice, HasLimits, Moveable):
             else:
                 return status.DISABLED, ''
         except TimeoutError:
-            return status.ERROR, 'timeout reading configured threshold'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def _get_status_parameters(self):
         # Otherwise takes a while to update
@@ -935,11 +969,15 @@ class DAQGate(DAQChannelEpicsDevice, Moveable):
 
     def doStatus(self, maxage=0):
         try:
+            severity, msg = self._sev_status_map('readpv')
+            if severity != status.OK:
+                return severity, msg
+
             if self.read() != self.target:
                 return status.BUSY, ''
             return status.OK, ''
         except TimeoutError:
-            return status.ERROR, 'timeout reading configured gate settings'
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def _get_status_parameters(self):
         # Otherwise takes a while to update
@@ -1057,6 +1095,33 @@ class SinqDetector(Detector):
     Identical to the default Detector class in core except for a small change
     in the preset generation.
     """
+
+    def valueInfo(self):
+        """
+        Overwritten method which excludes the DAQPreset channel from the output,
+        since the DAQPreset is essentially an alias for either a time or a
+        monitor channel (which should be already included in self._channels
+        anyway if the SinqDetector device is set up properly).
+        """
+        ret = []
+        for ch in self._channels:
+            if not isinstance(ch, DAQPreset):
+                ret.extend(ch.valueInfo())
+        return tuple(ret)
+
+    def doRead(self, maxage=0):
+        """
+        Overwritten method which excludes the DAQPreset channel from the output,
+        since the DAQPreset is essentially an alias for either a time or a
+        monitor channel (which should be already included in self._channels
+        anyway if the SinqDetector device is set up properly).
+        """
+        ret = []
+        for ch in self._channels:
+            if not isinstance(ch, DAQPreset):
+                ret.extend(ch.read(maxage))
+        return ret
+
 
     def _presetiter(self):
         """Yield (name, device, type) tuples for all 'preset-able' devices."""

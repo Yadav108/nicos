@@ -203,9 +203,9 @@ class SecNodeDevice(Readable):
     """
 
     parameters = {
-        'prefix':      Param("Prefix for the generated devices\n\n"
+        'prefix':      Param('Prefix for the generated devices\n\n'
                              "'$' will be replaced by the equipment id."
-                             " It should end with a trailing underscore",
+                             ' It should end with a trailing underscore',
                              type=str, default='$_', settable=True),
         'uri':         Param('tcp://<host>:<port>', type=str, settable=True),
         'auto_create': Param('Flag for automatic creation of devices',
@@ -327,7 +327,6 @@ class SecNodeDevice(Readable):
 
     def get_setup_info(self):
         if self._mode == SIMULATION:
-            session.simulationSync()
             return session.simulation_db.get('%s/setup_info' % self.name.lower())
         return self.setup_info
 
@@ -832,7 +831,8 @@ class SecopDevice(Device):
         parameters = {}
         # validators of special/pseudo parameters
         maintypes = {'value': anytype, 'status': tuple, 'target': anytype}
-        attrs = dict(parameters=parameters, __module__=cls.__module__, _maintypes=maintypes)
+        attrs = dict(parameters=parameters, _maintypes=maintypes,
+                     __module__=cls.__module__, __qualname__=cls.__qualname__)
         if 'value_datainfo' in devcfg:
             maintypes['value'] = get_validator(
                 devcfg.pop('value_datainfo'), use_limits=False)
@@ -949,16 +949,25 @@ class SecopDevice(Device):
         features = devcfg['secop_properties'].get('features', [])
         mixins = [importString(mixin) for mixin in add_mixins]
         mixins.extend([FEATURES[f] for f in features if f in FEATURES])
-        if set(devcfg['params_cfg']) & {'target_limits', 'target_min', 'target_max'}:
+
+        given_limits_params = set(devcfg['params_cfg']) & {
+            'target_limits', 'target_min', 'target_max'}
+        param_overrides = {}
+        if given_limits_params:
+            param_overrides.update((k, Override(userparam=False)) for k in given_limits_params)
             mixins.append(SecopHasLimits)
         if mixins:
             # create class to hold access methods
             newclass = DeviceMeta.__new__(
                 DeviceMeta, classname + '_base', (cls,), attrs)
+            mixcls = mixins[-1]
             # create class with mixins, with methods overriding access methods
             mixins.append(newclass)
+            add_attrs = dict(__module__=mixcls.__module__, __qualname__=mixcls.__qualname__)
+            if param_overrides:
+                add_attrs['parameter_overrides'] = param_overrides
             newclass = DeviceMeta.__new__(
-                DeviceMeta, classname, tuple(mixins), {})
+                DeviceMeta, classname, tuple(mixins), add_attrs)
         else:
             newclass = DeviceMeta.__new__(
                 DeviceMeta, classname, (cls,), attrs)

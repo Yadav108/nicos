@@ -63,7 +63,7 @@ def NewSample(name, **parameters):
 
     see also: `SetSample`, `SelectSample`, `ClearSamples`, `ListSamples`
 
-    .. note::
+    .. warning::
 
         It clears the list of existing samples!
 
@@ -231,7 +231,7 @@ def activation(formula=None, instrument=None,
         except ConfigurationError:
             pass
     if instrument is None:
-        raise UsageError('Please specifiy an instrument or flux')
+        raise UsageError('Please specify an instrument or flux')
     if mass is None:
         try:
             formula = session.experiment.sample.mass

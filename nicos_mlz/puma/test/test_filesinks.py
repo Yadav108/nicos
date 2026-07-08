@@ -27,7 +27,6 @@ import shutil
 import time
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from nicos import config
@@ -35,26 +34,14 @@ from nicos.commands.tas import qcscan
 from nicos.utils import updateFileCounter
 from nicos.commands.measure import SetEnvironment
 
+from test.nexus.utils import nxs_ds_as_str
+
 session_setup = 'puma'
 exp_dataroot = 'pumadata'
 
 year = time.strftime('%Y')
 
 h5py = pytest.importorskip('h5py', reason='h5py module is missing')
-
-
-def ds_as_str(ds):
-
-    if h5py.version.version_tuple[0] == 3:  # h5py >= 3
-        return ds.asstr()[()]
-
-    if h5py.check_string_dtype(ds.dtype).encoding == 'utf-8':
-        return ds[()]
-        # HDF5 ASCII strings
-    bdata = ds[()]
-    return np.array(
-        [b.decode('ascii') for b in bdata.flat], dtype=object
-    ).reshape(bdata.shape)
 
 
 class TestSinks:
@@ -215,6 +202,7 @@ class TestSinks:
                 'entry/instrument/source/probe',
                 'entry/instrument/source/type',
                 'entry/local_contact',
+                'entry/local_contact/affiliation',
                 'entry/local_contact/email',
                 'entry/local_contact/name',
                 'entry/local_contact/role',
@@ -225,10 +213,12 @@ class TestSinks:
                 'entry/mon1/type',
                 'entry/program_name',
                 'entry/proposal_user',
+                'entry/proposal_user/affiliation',
                 'entry/proposal_user/email',
                 'entry/proposal_user/name',
                 'entry/proposal_user/role',
                 'entry/sample',
+                'entry/sample/description',
                 'entry/sample/magnetic_field_env',
                 'entry/sample/magnetic_field_env/B',
                 'entry/sample/magnetic_field_env/B/value_log',
@@ -244,13 +234,27 @@ class TestSinks:
                 'entry/sample/rotation_angle',
                 'entry/sample/sgl',
                 'entry/sample/sgu',
-                'entry/sample/temperature_env',
+                'entry/sample/space_group',
                 'entry/sample/unit_cell',
                 'entry/start_time',
                 'entry/tim1',
                 'entry/title',
             }
-            assert ds_as_str(h5['entry/definition']) == 'NXtas'
+            assert nxs_ds_as_str(h5['entry/definition']) == 'NXtas'
             assert h5['entry/definition'].attrs['version'] == b'v2024.02'
-            assert ds_as_str(h5['entry/sample/name']) == 'mysample'
-            assert ds_as_str(h5['entry/local_contact/role']) == 'local_contact'
+            assert nxs_ds_as_str(h5['entry/sample/name']) == 'mysample'
+            assert nxs_ds_as_str(h5['entry/local_contact/role']) == 'local_contact'
+            assert nxs_ds_as_str(h5['entry/local_contact/name']) != ''
+            assert nxs_ds_as_str(h5['entry/local_contact/email']) != ''
+            # assert nxs_ds_as_str(h5['entry/local_contact/affiliation']) == ''
+            assert nxs_ds_as_str(h5['entry/experiment_identifier']) == 'p1234'
+            assert nxs_ds_as_str(h5['entry/program_name']) == 'NICOS'
+            assert nxs_ds_as_str(h5['entry/tim1/mode']) == 'timer'
+            assert h5['entry/tim1/preset'][0] == 0
+            assert h5['entry/tim1/integral'].len() == 3
+            assert all(h5['entry/tim1/integral'][:] == [0, 0, 0])
+            assert nxs_ds_as_str(h5['entry/mon1/mode']) == 'monitor'
+            assert nxs_ds_as_str(h5['entry/mon1/type']) == 'Fission_Chamber'
+            assert h5['entry/mon1/preset'][0] == 0
+            assert h5['entry/mon1/integral'].len() == 3
+            assert all(h5['entry/mon1/integral'][:] == [0, 0, 0])

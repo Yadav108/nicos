@@ -70,6 +70,8 @@ Experiment-related commands
 
 .. autofunction:: ListUsers
 
+.. _script_commands:
+
 Script-related commands
 -----------------------
 
@@ -116,6 +118,9 @@ Device commands
 .. autofunction:: maw
 .. autofunction:: rmove
 .. autofunction:: rmaw
+
+.. _stop_command:
+
 .. autofunction:: stop
 
 .. autofunction:: status
@@ -162,6 +167,8 @@ Measuring commands
 .. autofunction:: ListDatasinks
 .. autofunction:: avg
 .. autofunction:: minmax
+
+.. _scanning_commands:
 
 Scanning commands
 -----------------
@@ -245,13 +252,37 @@ one of your loaded setups.  Additionally, your experiment device has to be an
 Sample-related commands
 -----------------------
 
+Some remarks to the sample handling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In NICOS, there exists a single sample object which handles the sample
+parameters.  In addition, it stores the list of configured samples which can be
+selected during an experiment.
+
+The typical workflow is to load and configure all possible samples via a series
+of `SetSample <nicos.commands.sample.SetSample>` command calls.  All
+configured samples can be listed via the
+`ListSample <nicos.commands.sample.ListSamples>` command and a particular one
+can be selected via the `SelectSample <nicos.commands.sample.SelectSample>`
+command, which switches the parameters of the previous configured sample to
+the selected one.
+
+If a new set of samples should be loaded, it's helpful to clear the list of
+available samples via the `ClearSamples <nicos.commands.sample.ClearSamples>`
+command.
+
+The `NewSample <nicos.commands.sample.NewSample>` command combines the
+`ClearSamples() <nicos.commands.sample.ClearSamples>`,
+`SetSample(0, name, parameters)  <nicos.commands.sample.SetSample>`, and
+`SelectSample(0) <nicos.commands.sample.SelectSample>` into a single one.
+
 .. module:: nicos.commands.sample
 
-.. autofunction:: NewSample
 .. autofunction:: SetSample
-.. autofunction:: ListSamples
 .. autofunction:: SelectSample
+.. autofunction:: ListSamples
 .. autofunction:: ClearSamples
+.. autofunction:: NewSample
 
 Sample utility functions
 ------------------------

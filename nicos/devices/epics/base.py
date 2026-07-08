@@ -31,10 +31,11 @@ import time
 import numpy
 
 from nicos import session
-from nicos.core import POLLER, SIMULATION, ConfigurationError, \
+from nicos.core import POLLER, SIMULATION, ConfigurationError, MAIN, \
     DeviceMixinBase, HasLimits, HasPrecision, Moveable, Override, Param, \
     Readable, anytype, dictof, floatrange, none_or, pvname, status
 from nicos.devices.abstract import MappedMoveable, MappedReadable
+from nicos.devices.epics.status import EPICS_TIMEOUT_MSG
 from nicos.utils import HardwareStub
 
 __all__ = [
@@ -56,6 +57,8 @@ class EpicsDevice(DeviceMixinBase):
         'monitor': Param('Use a PV monitor', type=bool, default=False),
         'pva': Param('Use pva', type=bool,
                      default=DEFAULT_EPICS_PROTOCOL == 'pva'),
+        'cbs_in_daemon': Param('Use callbacks in daemon, default is poller',
+                     type=bool, default=False),
     }
 
     hardware_access = True
@@ -101,10 +104,19 @@ class EpicsDevice(DeviceMixinBase):
         self._epics_subscriptions = []
         value_pvs = list(self._cache_relations.keys())
         status_pvs = self._get_status_parameters()
-        if session.sessiontype == POLLER:
+
+        # The first parenthesis covers normal cases where epics devices are
+        # declared in the setup file directly, this creates callbacks in the
+        # poller.
+        # The second case after 'or' is the case of dynamic epics devices where
+        # we need to create the callbacks in the daemon.
+        # These cases could be condensed with xor:
+        # session.sessiontype == POLLER ^ self.cbs_in_daemon,
+        # but that may be unintuitive.
+        if (session.sessiontype == POLLER and not self.cbs_in_daemon) \
+                or (session.sessiontype == MAIN and self.cbs_in_daemon):
             self._subscribe_params(value_pvs, self.value_change_callback)
-        else:
-            self._subscribe_params(status_pvs or value_pvs,
+            self._subscribe_params(status_pvs,
                                    self.status_change_callback)
 
     def _subscribe_params(self, pvparams, change_callback):
@@ -144,6 +156,8 @@ class EpicsDevice(DeviceMixinBase):
             self.log.debug('%s connected!', name)
         else:
             self.log.warning('%s disconnected!', name)
+        current_status = self.doStatus()
+        self._cache.put(self._name, 'status', current_status, time.time())
 
     def _get_cache_relation(self, param):
         # Returns the cache key associated with the parameter.
@@ -151,7 +165,7 @@ class EpicsDevice(DeviceMixinBase):
 
     def _get_status_parameters(self):
         # Returns the parameters which indicate "status".
-        return set()
+        return set(self._cache_relations.keys())
 
     def doShutdown(self):
         for sub in self._epics_subscriptions:
@@ -169,12 +183,9 @@ class EpicsDevice(DeviceMixinBase):
     def doStatus(self, maxage=0):
         # For most devices we only care about the status of the read PV
         try:
-            severity, msg = self.get_alarm_status('readpv')
+            return self.get_alarm_status('readpv')
         except TimeoutError:
-            return status.ERROR, 'timeout reading status'
-        if severity in [status.ERROR, status.WARN]:
-            return severity, msg
-        return status.OK, msg
+            return status.ERROR, EPICS_TIMEOUT_MSG
 
     def _setMode(self, mode):
         # remove the PVs on entering simulation mode, to prevent
@@ -209,8 +220,6 @@ class EpicsDevice(DeviceMixinBase):
         fields, hence the operation will always time out. In such a case,
         consider using `_put_pv_readback_checked` instead.
         """
-        # If wait = True then will block until finished or timeout.
-        # It cannot be interrupted
         self._epics_wrapper.put_pv_value(self._param_to_pv[pvparam], value,
                                          timeout=timeout)
 
@@ -225,7 +234,7 @@ class EpicsDevice(DeviceMixinBase):
         a timeout there, the EPICS callback mechanism (see
         https://epics.anl.gov/base/R3-14/12-docs/CAref.html#ca_put) is used to
         verify whether an input has been processed within the given timeout.
-        In constrast, this function does not rely on the callback mechanism.
+        In contrast, this function does not rely on the callback mechanism.
 
         This is useful for example in the case of the motor record, where
         many fields such as `.VELO` do not use the callback mechanism (using
@@ -364,7 +373,7 @@ class EpicsMoveable(EpicsDevice, Moveable):
                         type=pvname, mandatory=True, userparam=False),
         'writepv': Param('PV for writing device target',
                          type=pvname, mandatory=True, userparam=False),
-        'targetpv': Param('Optional target readback PV.',
+        'targetpv': Param('Optional target readback PV',
                           type=none_or(pvname), mandatory=False,
                           userparam=False)
     }
@@ -481,7 +490,7 @@ class EpicsAnalogMoveable(HasLimits, HasPrecision, EpicsMoveable):
     def doStatus(self, maxage=0):
         severity, msg = EpicsMoveable.doStatus(self, maxage)
 
-        if severity in [status.ERROR, status.WARN]:
+        if severity != status.OK:
             return severity, msg
 
         at_target = HasPrecision.doIsAtTarget(self, self.doRead(),
@@ -544,6 +553,9 @@ class EpicsMappedReadable(MappedReadable, EpicsReadable):
         return self._get_pv('readpv', as_string=True)
 
     def doStatus(self, maxage=0):
+        stat, msg = EpicsDevice.doStatus(self, maxage)
+        if stat != status.OK:
+            return stat, msg
         stat, msg = MappedReadable.doStatus(self, maxage)
         return stat, '' if stat == status.OK else msg
 
@@ -606,6 +618,9 @@ class EpicsMappedMoveable(MappedMoveable, EpicsMoveable):
             EpicsMoveable.doStop(self)
 
     def doStatus(self, maxage=0):
+        stat, msg = EpicsDevice.doStatus(self, maxage)
+        if stat != status.OK:
+            return stat, msg
         stat, msg = MappedMoveable.doStatus(self, maxage)
         return stat, '' if stat == status.OK else msg
 

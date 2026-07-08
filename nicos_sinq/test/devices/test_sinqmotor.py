@@ -37,14 +37,6 @@ class FakeSinqMotor(FakeEpicsMotor, SinqMotor):
     Epics motor with fake getting and setting of PVs.
     """
 
-    def doPreinit(self, mode):
-        FakeEpicsMotor.doPreinit(self, mode)
-        self.values['enable'] = 0
-        self.values['enable_rbv'] = 1
-        self.values['connected_rbv'] = 1
-        self.values['can_disable'] = 1
-        self.values['encoder_type'] = 'incremental'
-
     def doReset(self):
         FakeEpicsMotor.doReset(self)
         self.values['enable'] = 0
@@ -52,12 +44,17 @@ class FakeSinqMotor(FakeEpicsMotor, SinqMotor):
         self.values['connected_rbv'] = 1
         self.values['can_disable'] = 1
         self.values['encoder_type'] = 'incremental'
+        self.values['fixifnothomed'] = 0
         self.inputlimits = self.doReadAbslimits()
-        self.delta_limits = (0,0)
+        self.delta_limits = (0, 0)
+
+    def doPreinit(self, mode):
+        self.doReset()
 
     # Suppress subscription of PV callbacks
     def doInit(self, mode):
         pass
+
 
 # Run the tests from the base class, but use the 'sinq_epics_motor_pva' setup
 # Then, some additional tests are run.
@@ -71,99 +68,138 @@ class DefTestSinqMotor(DefTest):
     def test_status_without_errormsgpv(self):
         pass
 
-    def test_defaultpvs(self):
-        assert self.motor._get_pv_name('errormsgpv') == self.motor.motorpv + \
+    def test_has_been_homed(self, motor):
+        # Motor is homed by default
+        assert motor._has_been_homed()
+
+    def test_defaultpvs(self, motor):
+        assert motor._get_pv_name('errormsgpv') == motor.motorpv + \
                SinqMotor._extension_records['errormsgpv']
-        assert self.motor._get_pv_name('reseterrorpv') == self.motor.motorpv + \
+        assert motor._get_pv_name('reseterrorpv') == motor.motorpv + \
                SinqMotor._extension_records['reseterrorpv']
 
-    def test_status_ext(self):
+    def test_status_ext(self, motor):
 
         # Motor is idle
-        stat = self.motor.status()
+        stat = motor.status()
         assert stat[0] == status.OK
         assert not stat[1]
-        assert self.motor.enabled
-        assert self.motor.connected
+        assert motor.enabled
+        assert motor.connected
 
         # Motor is disabled
-        self.motor.values['enable_rbv'] = 0
-        assert not self.motor.enabled
-        stat = self.motor.status()
+        motor.values['enable_rbv'] = 0
+        assert not motor.enabled
+        stat = motor.status()
         assert stat[0] == status.DISABLED
         assert stat[1]
 
         # Motor is disabled AND has an error
-        self.motor.values['enable_rbv'] = 0
-        self.motor.values['errormsgpv'] = 'TestError'
-        self.motor.values['alarm_severity'] = 2
-        stat = self.motor.status()
+        motor.values['enable_rbv'] = 0
+        motor.values['errormsgpv'] = 'TestError'
+        motor.values['alarm_severity'] = 2
+        stat = motor.status()
         assert stat[0] == status.ERROR
         assert 'disabled' in stat[1]
         assert 'TestError' in stat[1]
-        self.motor.values['errormsgpv'] = ''
-        self.motor.values['alarm_severity'] = 0
+        motor.values['errormsgpv'] = ''
+        motor.values['alarm_severity'] = 0
 
         # Motor is disconnected
-        self.motor.values['connected_rbv'] = 0
-        assert not self.motor.connected
-        stat = self.motor.status()
+        motor.values['connected_rbv'] = 0
+        assert not motor.connected
+        stat = motor.status()
         assert stat[0] == status.DISABLED
         assert stat[1]
 
         # Motor is disconnected AND has an error
-        self.motor.values['errormsgpv'] = 'TestError'
-        self.motor.values['alarm_severity'] = 2
-        stat = self.motor.status()
-        print(stat)
+        motor.values['errormsgpv'] = 'TestError'
+        motor.values['alarm_severity'] = 2
+        stat = motor.status()
         assert stat[0] == status.DISABLED
         assert 'disconnected' in stat[1]
-        assert 'TestError' not in stat[1] # Error is not shown if motor is disconnected
-        self.motor.values['errormsgpv'] = ''
-        self.motor.values['alarm_severity'] = 0
+        assert 'TestError' not in stat[1]  # Error is not shown if motor is disconnected
+        motor.values['errormsgpv'] = ''
+        motor.values['alarm_severity'] = 0
 
-    def test_enable(self):
+    def test_enable(self, motor):
 
         # Try to disable a motor which is moving
-        self.motor.values['moving'] = 1
+        motor.values['moving'] = 1
         with pytest.raises(UsageError):
-            self.motor.disable()
-        self.motor.values['moving'] = 0
+            motor.disable()
+        motor.values['moving'] = 0
 
         # Try to disable a motor which cannot be disabled
-        self.motor.values['can_disable'] = 0
+        motor.values['can_disable'] = 0
         with pytest.raises(UsageError):
-            self.motor.disable()
+            motor.disable()
 
         # A disabled motor which cannot be disabled can still be enabled
-        self.motor.values['can_disable'] = 0
-        self.motor.values['enable_rbv'] = 1
-        self.motor.enable()
+        motor.values['can_disable'] = 0
+        motor.values['enable_rbv'] = 1
+        motor.enable()
 
     @pytest.mark.timeout(5)
-    def test_reference_absolute(self):
-        self.motor.values['encoder_type'] = 'absolute'
+    def test_reference_absolute(self, motor):
+        motor.values['encoder_type'] = 'absolute'
 
         # Motors with absolute encoders do not perform a reference run
-        self.motor.reference()
-        stat = self.motor.status()
+        motor.reference()
+        stat = motor.status()
         assert stat[0] == status.OK
         assert not stat[1]
 
-class TestSinqmotor1(DefTestSinqMotor):
-    motor = None
+    def test_not_homed(self, motor):
+        # Motor is not homed
+        motor.values['status'] = int('0000000000000010', 2)
+        assert not motor.homed
 
-    @pytest.fixture(autouse=True)
-    def prepare(self, session):
-        self.session = session
-        self.motor = self.session.getDevice('motor1')
-        self.motor.reset()
+        # Motor is not homed, but also not fixed if it hasn't been homed
+        motor.values['fixifnothomed'] = 0
+        stat = motor.status()
+        assert stat[0] == status.OK
+        assert stat[1] == 'Motor needs to be referenced.'
+
+        # Now motor is fixed within the EPICS driver if it hasn't been homed yet
+        motor.values['fixifnothomed'] = 1
+        stat = motor.status()
+        assert stat[0] == status.OK
+        assert stat[1] == 'Motor needs to be referenced.'
+
+        # Set the "homed" bit in the status PV - warning disappears
+        motor.values['status'] = int('0100000000000010', 2)
+        assert motor.homed
+        stat = motor.status()
+        assert stat[0] == status.OK
+        assert not stat[1]
+
+    def test_reference_message(self, motor):
+        motor.values['status'] = int('0000000000000010', 2) # Motor is not referenced
+        assert motor._get_pv('status') == 2
+        assert motor._has_been_homed() == 0
+        assert motor.status(0) == (status.OK, 'Motor needs to be referenced.')
+
+        motor.values['status'] = int('0100000010000010', 2) # Motor is not referenced
+        assert motor._get_pv('status') == 16514
+        assert motor._has_been_homed() == 1
+        assert motor.status(0) == (status.OK, 'at reference position')
+
+
+class TestSinqmotor1(DefTestSinqMotor):
+
+    pass
+
 
 class TestsSinqMotor2(DefTestSinqMotor):
-    motor = None
 
-    @pytest.fixture(autouse=True)
-    def prepare(self, session):
-        self.session = session
-        self.motor = self.session.getDevice('motor2')
-        self.motor.reset()
+    @pytest.fixture
+    def motor(self, session):
+        m = session.getDevice('motor2')
+        m.reset()
+        yield m
+        m.reset()
+
+    @pytest.fixture
+    def jogmove(self, session):
+        return session.getDevice('jogmove2')

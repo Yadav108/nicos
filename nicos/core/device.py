@@ -138,7 +138,7 @@ class DeviceMeta(DeviceMixinMeta):
                                        'not all-lowercase' % (name, adevname))
             if not isinstance(entry, Attach):
                 raise ProgrammingError("Please use 'Attach' to define an "
-                                       "attached device.")
+                                       'attached device.')
 
         # create parameter properties
         for param, info in newtype.parameters.items():
@@ -158,6 +158,22 @@ class DeviceMeta(DeviceMixinMeta):
             override = newtype.parameter_overrides.pop(param, None)
             if override:
                 info = newtype.parameters[param] = override.apply(info)
+
+            # Check the combined, final parameter configuration composed of
+            # Param and Override.
+            if info.mandatory:
+                if info.internal:
+                    raise ProgrammingError(
+                            'Ambiguous parameter definition detected for' \
+                            "parameter %r (device %r): 'internal' and "
+                            "'mandatory' must not be 'True' at the same time."
+                            %(param, name))
+                if info.volatile:
+                    raise ProgrammingError(
+                            'Ambiguous parameter definition detected for' \
+                            "parameter %r (device %r): 'volatile' and "
+                            "'mandatory' must not be 'True' at the same time."
+                            %(param, name))
 
             # create the getter method
             if not info.volatile:
@@ -302,11 +318,11 @@ class Device(metaclass=DeviceMeta):
     # Param objects.
     parameters = {
         'name':        Param('The name of the device',
-                             type=str, settable=False, userparam=False),
+                             type=nicosdev, settable=False, internal=True),
         'classes':     Param('Names of device class and all its base classes',
-                             type=listof(str), settable=False, userparam=False),
-        'description': Param('A description of the device', type=str,
-                             settable=False),
+                             type=listof(str), settable=False, internal=True),
+        'description': Param('A description of the device',
+                             type=str, settable=False),
         'visibility':  Param('Selects in which context the device should be '
                              'shown/included',
                              type=setof('metadata', 'namespace', 'devlist'),
@@ -535,7 +551,16 @@ class Device(metaclass=DeviceMeta):
             # mandatory parameters must be in config, regardless of cache
             if paraminfo.mandatory and param not in self._config:
                 raise ConfigurationError(self, 'missing configuration '
-                                         'parameter %r' % param)
+                                         'parameter %r in setup file' % param)
+
+            # A volatile parameter must not be given in the setup (except for
+            # tests, there it is ok because there is no hardware to read from)
+            if session.mode != SIMULATION:
+                if paraminfo.volatile and param in self._config:
+                    raise ConfigurationError(self, 'parameter %r is volatile and '
+                                            'must not be defined in the '
+                                            'setup file' % param)
+
             # Ellipsis representing "no value" since None is a valid value for
             # some parameters
             value = Ellipsis
@@ -613,7 +638,7 @@ class Device(metaclass=DeviceMeta):
             if param in self._config and paraminfo.internal:
                 self.log.warning(
                     "'%s' is configured in a setup file although "
-                    "declared as internal parameter",
+                    'declared as internal parameter',
                     param
                 )
 
@@ -2260,7 +2285,7 @@ class Measurable(Waitable):
         the array result(s) of the last measurement.
 
         The array results will be read first calling `readArrays` because
-        there migth be side effects on the scalar result of `read`, e.g.
+        there might be side effects on the scalar result of `read`, e.g.
         `ImageChannelMixin`'s standard implementation of `doRead` returns
         `self.readresult` which will probably be altered in `doReadArrays`.
         """
@@ -2432,10 +2457,7 @@ class DeviceAlias(Device):
         Device.__init__(self, name, **config)
         # update the configured alias device - we do this after the init
         # procedure to avoid calling init stuff in the aliased dev
-        devname = config.get('alias')
-        if devname is None and self._cache:
-            devname = self._cache.get(self, 'alias', '')
-        self.doUpdateAlias(devname)
+        self.doUpdateAlias(self.alias)
         self._initialized = True
 
     def __repr__(self):

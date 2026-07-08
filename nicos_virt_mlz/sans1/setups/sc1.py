@@ -10,7 +10,6 @@ devices = dict(
         pollinterval = 15,
         maxage = 60,
         fmtstr = '%.2f',
-        abslimits = (-0, 600),
         precision = 0.01,
         motor = 'sc1_ymot',
     ),
@@ -24,7 +23,7 @@ devices = dict(
     ),
     sc1 = device('nicos.devices.generic.MultiSwitcher',
         description = 'Sample Changer 1 Huber device',
-        moveables = ['sc1_y', 'st1_z'],
+        moveables = ['sc1_y', 'st_z'],
         mapping = {
             1: [594.5, -31],
             2: [535.5, -31],

@@ -36,6 +36,8 @@ from nicos.devices.experiment import Experiment as CoreExperiment
 from nicos.core.errors import InvalidValueError
 from nicos.utils import readFile, writeFile
 
+SERVICE_EXP = 'Service'
+
 class Experiment(CoreExperiment):
     """Base experiment for SINQ
 
@@ -52,10 +54,12 @@ class Experiment(CoreExperiment):
     parameter_overrides = {
         'propprefix': Override(default=''),
         'serviceexp': Override(
-            default='Service', internal=True, settable=False),
+            default=SERVICE_EXP, internal=True, settable=False),
         'sendmail': Override(default=False),
         'zipdata': Override(default=False),
         'elog': Override(default=False),
+        'title': Override(settable=True),
+        'users': Override(settable=True),
     }
 
     parameters = {
@@ -68,6 +72,9 @@ class Experiment(CoreExperiment):
                             category='experiment'),
         'duo_url': Param('Duo url', type=str,
             default='https://duo.psi.ch/duo/api.php'),
+        'persistent_environment': Param(
+            'environment devices to be added if present',
+            type=list, settable=True, userparam=False, default=[])
     }
 
     def proposalpath_of(self, proposal):
@@ -93,10 +100,10 @@ class Experiment(CoreExperiment):
         return path.join(self.dataroot, 'data', time.strftime('%Y'), prop)
 
     def doWriteTitle(self, title):
-        self.propinfo['title'] = title
+        self.update(title=title)
 
     def doWriteUsers(self, users):
-        self.propinfo['users'] = users
+        self.update(users=users)
 
     def _newPropertiesHook(self, proposal, kwds):
         if 'proposal_title' in kwds:
@@ -107,10 +114,19 @@ class Experiment(CoreExperiment):
             kwds['proposal'] = proposal
         return kwds
 
+    def _newSetupHook(self):
+        envlist = [k for k in self.persistent_environment if k in session.devices]
+        if envlist:
+            self.setEnvironment(envlist)
+            self.log.info('reset environment to %r', envlist)
+
     def newSample(self, parameters):
         # Do not try to create unwanted directories as
         # in nicos/devices/experiment
         pass
+
+    def doReadTitle(self):
+        return self.propinfo.get('title', SERVICE_EXP)
 
     def doFinish(self):
         """
@@ -140,7 +156,7 @@ class Experiment(CoreExperiment):
 
     def _requestDuoProposal(self, proposal=None):
         """ Request proposal from duo.
-        Returns a dictionary with duoinfo if succesful.
+        Returns a dictionary with duoinfo if successful.
         If response is 404 it raises an exception.
         Anything else returns None.
         """
@@ -282,7 +298,7 @@ class Experiment(CoreExperiment):
         return
 
     def _queryProposals(self, proposal=None, kwds=None):
-        # The instrument name at SINQ is usally given as "SINQ <INST>". Hence,
+        # The instrument name at SINQ is usually given as "SINQ <INST>". Hence,
         # the string is split and only the last part is taken.
         self.log.debug('Query proposal %s \n %s', proposal, kwds)
 
@@ -371,8 +387,8 @@ class SicsDataManager(DataManager):
         result = []
         exp = session.experiment
         if countertype == 'scan':
-            val = exp.sicscounter
-            exp.updateSicsCounterFile(val+1)
+            val = exp.sicscounter + 1
+            exp.updateSicsCounterFile(val)
             result.append((countertype, val))
             result.append(('counter', val))
             self._pointcounter = 1

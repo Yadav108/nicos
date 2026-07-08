@@ -3,7 +3,7 @@ group = 'optional'
 
 includes = []
 
-excludes = ['hicamfluo_acquisition_trigger', 'detector_ill']
+excludes = ['hicamfluo_acquisition_trigger', 'detector_ill', 'ac_yoke']
 
 tango_base = 'tango://localhost:10000/antares/funcgen_burst/'
 

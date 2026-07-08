@@ -4,7 +4,9 @@ display_order = 20
 
 devices = dict(
     dvv = device('nicos_sinq.amor.devices.virtual_source.NumberSwitcher',
-                 description = 'Virtual source vertical opening',
+                 description = '''Virtual source vertical opening
+                 position  1   2   3   4   5   6   7   8
+                 opening  .5   1   2   3   4   6   8  10 mm''',
                  mapping = {
                      1: 0.,
                      2: 45.,
@@ -19,13 +21,15 @@ devices = dict(
                  moveable = 'dvv_motor',
                  fmtstr = '%d',
                  ),
-    dvv_motor = device('nicos_sinq.devices.epics.sinqmotor_deprecated.SinqMotor',
+    dvv_motor = device('nicos_sinq.devices.epics.motor.SinqMotor',
                        description = 'Virtual source vertical motor',
                        motorpv = 'SQ:AMOR:turboPmac4:dvv',
                        visibility = (),
                        ),
     dvh = device('nicos_sinq.amor.devices.virtual_source.NumberSwitcher',
-                 description = 'Virtual source horiziontal opening',
+                 description = '''Virtual source horizontal opening
+                 position  1   2   3   4   5   6   7   8
+                 opening   2   4   6   8  10  15  20  30 mm''',
                  mapping = {
                      1: 0.,
                      2: 45.,
@@ -40,7 +44,7 @@ devices = dict(
                  moveable = 'dvh_motor',
                  precision = 0.1,
                  ),
-    dvh_motor = device('nicos_sinq.devices.epics.sinqmotor_deprecated.SinqMotor',
+    dvh_motor = device('nicos_sinq.devices.epics.motor.SinqMotor',
                        description = 'Virtual source horiziontal motor',
                        motorpv = 'SQ:AMOR:turboPmac4:dvh',
                        visibility = (),
@@ -59,7 +63,7 @@ devices = dict(
                  moveable = 'dmf_motor',
                  visibility = ('metadata', 'namespace'),
                  ),
-    dmf_motor = device('nicos_sinq.devices.epics.sinqmotor_deprecated.SinqMotor',
+    dmf_motor = device('nicos_sinq.devices.epics.motor.SinqMotor',
                        description = 'Diaphragm at middle focus, motor',
                        motorpv = 'SQ:AMOR:turboPmac4:dmf',
                        visibility = (),

@@ -22,6 +22,12 @@ Existing widgets are:
 :class:`.ValueLabel` (in nicos.guisupport.display)
    A very simple label that displays a single value without coloring
 
+:class:`.SqueezedLabel` (in nicos.guisupport.display)
+   A label that elides text to fit its width.
+
+:class:`.TimeValueLabel` (in nicos.guisupprt.display)
+   A label which displays a time in a human readable format.
+
 :class:`.PictureDisplay` (in nicos.guisupport.display)
    Displays a picture file, with automatic checking for updates.
 
@@ -31,11 +37,28 @@ Existing widgets are:
 :class:`.ValueLed`, :class:`.StatusLed`, and :class:`.ClickableOutputLed` (in nicos.guisupport.led)
    Display a boolean value or a device status as a stylized LED.
 
+:class:`.PushButton` (in nicos.guisupport.button)
+   Display a push button with a light (as a stylized LED).
+
+:class:`.SinglePushButton` (in nicos.guisupport.button)
+   Display a push button with a light (as a stylized LED) and only a single
+   value to switch On or Off.
+
 :class:`.DeviceValueEdit` and :class:`.DeviceParamEdit` (in nicos.guisupport.typedvalue)
    Displays a widget (or a number of widgets) suitable for editing the value
    of a device or parameter.  For example, a normal edit box (with validators)
    is used for floating values, while combo box is used for values with a
    fixed number of choices.
+
+:class:`.MultiList` in (nicos.guisupport.containers)
+    Displays a list of entries, where each entry is a frame loaded from a
+    UI file.
+
+:class:`.DeviceParamTree` in (nicos.guisupport.trees)
+    Displays devices and their parameters.
+
+:class:`.TasWidget` in (nicos.guisupport.tas)
+   Displays of the TAS table configuration.
 
 All widgets are provided in the Qt designer when starting it :ref:`in the
 correct way <gui-designer>`.
@@ -243,6 +266,18 @@ Existing widget classes
       By default this is just ``str``.
 
 
+.. class:: SqueezedLabel
+
+   .. figure:: squeezedlabel.png
+      :align: center
+
+   A label that elides text to fit its width.  If the text was elided at the
+   end `...` will be added.
+
+
+.. class:: TimeValueLabel
+
+
 .. class:: PictureDisplay
 
    .. figure:: picturedisplay.png
@@ -383,9 +418,30 @@ Existing widget classes
       The equivalent to 'OFF' for the selected device (red).
 
 
+.. module:: nicos.guisupport.button
+
+.. class:: PushButton
+
+   .. figure:: valueled.png
+      :align: center
+
+   An LED like image that shows its device's value and changes it on click.
+   The LED then changes its color to orange until the value is updated in
+   the cache.
+
+
+.. class:: SinglePushButton
+
+   .. figure:: singlepushbutton.png
+      :align: center
+
+
 .. module:: nicos.guisupport.typedvalue
 
 .. class:: DeviceValueEdit
+
+   .. figure:: devicevalueedit.png
+      :align: center
 
    This widget presents a suitable child widget (or child widgets) for the user
    to enter or edit the value of a NICOS device.  The value is determined based
@@ -452,9 +508,151 @@ Existing widget classes
       value should be edited.
 
 
+.. module:: nicos.guisupport.containers
+
+.. class:: MultiList
+
+   .. figure:: multilist.png
+      :align: center
+
+
+.. module:: nicos.guisupport.trees
+
+.. class:: DeviceParamTree
+
+   .. figure:: deviceparamtree.png
+      :align: center
+
+
 .. module:: nicos.guisupport.tas
 
-.. autoclass:: TasWidget()
+.. class:: TasWidget
 
    .. figure:: taswidget.png
       :align: center
+
+.. module:: nicos.guisupport.valuewidgets
+
+.. class:: ValueGauge
+
+   .. figure:: value_gauge.png
+      :align: center
+
+   Properties:
+
+    .. attribute:: dev
+
+       NICOS device name, if set, display value of this device'
+
+    .. attribute:: key
+
+       Cache key to display (without "nicos/" prefix), set either "dev" or this
+
+    .. attribute:: statuskey
+
+       Cache key to extract status information  for coloring value, if "dev" is
+       given this is set automatically
+
+    .. attribute:: name
+
+       Name of the value to display
+
+    .. attribute:: unit
+
+       Unit of the value to display
+
+    .. attribute:: fmtstr
+
+       Format string to use for the value. If "dev" is given this defaults to
+       the "fmtstr" set in NICOS
+
+    .. attribute:: width
+
+       Width of the widget in units of the width of one character
+
+    .. attribute:: height
+
+       Height of the widget in units of the width of one character
+
+    .. attribute:: start_value
+
+       Lowest value for display
+
+    .. attribute:: end_value
+
+       Highest value for display
+
+    .. attribute:: start_angle
+
+       Location of first tick, 0 is top
+
+    .. attribute:: end_angle
+
+       Location of last tick, 0 is top
+
+    .. attribute:: ticks
+
+       Number of tick-lines with values to draw
+
+    .. attribute:: log_values
+
+       Show values logarithmically
+
+    .. attribute:: status_led
+
+       Show LED status indicator
+
+    .. attribute:: background_color
+
+    .. attribute:: inley_color
+
+    .. attribute:: boundary_color
+
+.. class:: ValueProgressBar
+
+   .. figure:: value_progress_bar.png
+      :align: center
+
+   Properties:
+
+    .. attribute:: dev
+
+       NICOS device name, if set, display value of this device'
+
+    .. attribute:: key
+
+       Cache key to display (without "nicos/" prefix), set either "dev" or this
+
+    .. attribute:: statuskey
+
+       Cache key to extract status information  for coloring value, if "dev" is
+       given this is set automatically
+
+    .. attribute:: name
+
+       Name of the value to display
+
+    .. attribute:: unit
+
+       Unit of the value to display
+
+    .. attribute:: fmtstr
+
+       Format string to use for the value. If "dev" is given this defaults to
+       the "fmtstr" set in NICOS
+
+    .. attribute:: width
+
+       Width of the widget in units of the width of one character
+
+    .. attribute:: height
+
+       Height of the widget in units of the width of one character
+
+    .. attribute:: start_value
+
+       Lowest value for display
+
+    .. attribute:: end_value
+
+       Highest value for display

@@ -115,15 +115,22 @@ def _rmove_poshook(dev, delta):
     curpos = dev.read(0)
     # if the target is reached (within precision), use it as the base for
     # the relative movement to avoid accumulating small errors
-    curpos = dev.target if dev.isAtTarget(curpos) else curpos
+    curpos = dev.target if dev.target is not None and dev.isAtTarget(curpos) else curpos
     if isinstance(curpos, str):
         raise UsageError('Device %s cannot be used with relative movement' %
                          dev)
     try:
+        dev.valuetype(delta)
+    except (ValueError, TypeError) as e:
+        raise UsageError('Device %s: wrong delta type: %r (%s)' %
+                         (dev, delta, e)) from e
+    try:
+        if isinstance(delta, (list, tuple)):
+            return dev.valuetype(list(sum(x) for x in zip(curpos, delta)))
         return curpos + delta
-    except Exception:
+    except Exception as e:
         raise UsageError('Device %s cannot be used with relative movement or '
-                         'wrong delta type %r' % (dev, delta)) from None
+                         'wrong delta type %r (%s)' % (dev, delta, e)) from e
 
 
 @usercommand
@@ -401,7 +408,7 @@ def waitfor_stable(device, target, accuracy, time_stable, timeout=3600):
 
     >>> waitfor_stable(dev1, 10, 1, 30, 600)
 
-    will wait until the device position is between 9 and 11 for a continous
+    will wait until the device position is between 9 and 11 for a continuous
     period of 30 seconds, but will exit after 10 minutes if
     stability is not reached.
 
@@ -539,13 +546,15 @@ def stop(*devlist):
 
     If no device is given, stop all stoppable devices in parallel.
 
-    .. note::
+    .. attention::
 
         Stopping device(s) via this function does **not** cancel any queued
-        commands.
-        The next queued command will be immediately executed and the stopped
-        device(s) will be started again if the next commands in the queue
-        require this.
+        commands or stop a running script.
+
+        The next queued command or line in a script will be immediately
+        executed and the stopped device(s) will be started again if the next
+        commands in the queue require this.
+
         To stop both, all devices and empty the queue, use the the `/stop`
         command or Ctrl+C on the NICOS console client or select the `Stop right
         now` button in the script control menu of the GUI.
@@ -664,8 +673,7 @@ def reset(*devlist):
     """Reset the given device(s).
 
     This can restore communication with the device, re-set a positioning fault
-    or make a reference drive (only for devices where this cannot lead to
-    crashes, such as slits).
+    or try other forms of reinitialization without moving the device.
 
     Examples:
 
@@ -965,7 +973,7 @@ def history(dev, key='value', fromtime=None, totime=None, interval=None):
     >>> history(mth, 'speed', '14:00', '17:00')    # between 14h and 17h today
     >>> history(mth, 'speed', '2012-05-04', '2012-05-08')  # between two days
 
-    Example for interval specification. Setting 10 seconds as the minumum
+    Example for interval specification. Setting 10 seconds as the minimum
     interval between two adjacent data points:
 
     >>> history(mth, 'speed', '2012-05-04', '2012-05-08', 10) # in [seconds]

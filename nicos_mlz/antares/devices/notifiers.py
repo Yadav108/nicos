@@ -31,9 +31,9 @@ class TelegramNotifier(Notifier):
     """Notifier sending messages to the Telegram messenger service."""
 
     parameters = {
-        'chatid': Param('Chat ID the bot should send the messages to.',
+        'chatid': Param('Chat ID the bot should send the messages to',
                         type=str, mandatory=True),
-        'bottoken': Param('Bot API access token.',
+        'bottoken': Param('Bot API access token',
                           type=str, mandatory=True),
     }
 
@@ -53,4 +53,4 @@ class TelegramNotifier(Notifier):
         try:
             _ = requests.get(url_req, timeout=3)
         except Exception as e:
-            self.log.warn(f'TelegramNotifier:send got error ({str(e)}).')
+            self.log.warning('TelegramNotifier:send got error (%s).', e)

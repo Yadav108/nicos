@@ -56,8 +56,9 @@ class Authenticator(BaseAuthenticator):
     """Authenticates against the configured LDAP server.
 
     Basically it tries to bind on the server with the given userdn.
-    Per default, all ldap users are rejected when there is no user level
-    definition inside the 'roles' dictionary.
+
+    Per default, all LDAP users are rejected if there is **no** user level
+    definition inside the `userroles` or `grouproles` dictionary.
     """
 
     BIND_METHODS = {
@@ -72,7 +73,7 @@ class Authenticator(BaseAuthenticator):
                              type=listof(ldapuri), mandatory=True),
         'bindmethod':  Param('LDAP port', type=oneof(*BIND_METHODS),
                              default='no_tls'),
-        'userbasedn':  Param('Base dn to query users.',
+        'userbasedn':  Param('Base dn to query users',
                              type=str,
                              mandatory=True),
         'userfilter':  Param('Filter for querying users. Must contain '

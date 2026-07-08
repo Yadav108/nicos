@@ -756,7 +756,7 @@ class Session:
             self.log.error('the following devices could not be created:')
             self.log.error(', '.join(failed_devs))
             self.log.info("use CreateDevice('device') or CreateAllDevices() "
-                          "later to retry")
+                          'later to retry')
 
         for setupname in setupnames:
             if self._setup_info[setupname]['extended'].get('dynamic_loaded'):
@@ -932,7 +932,7 @@ class Session:
             if setup not in ('startup', ['startup']) or not self.cache:
                 return
             # If we became master, the user didn't select a specific startup
-            # setup and a previous master setup was configured, re-use that.
+            # setup and a previous master setup was configured, reuse that.
             setups = self.cache.get(self, 'mastersetupexplicit')
             if not setups or setups == ['startup']:
                 return
@@ -1535,7 +1535,8 @@ class Session:
                   self._setup_info[setup]['extended'].get('dynamic_loaded')]
         user = self.getExecutingUser()
         supervisor = SimulationSupervisor(self._sandbox_helper, uuid, code,
-                                          setups, user, emitter, quiet=quiet)
+                                          setups, user, emitter, quiet=quiet,
+                                          cache=self.current_sysconfig.get('cache'))
         supervisor.start()
         if wait:
             supervisor.join()
@@ -1663,6 +1664,7 @@ class Session:
         for setup in self.loaded_setups:
             helpdict.update(self._setup_info[setup].get('help_topics', {}))
         return helpdict
+
 
 # must be imported after class definitions due to module interdependencies
 from nicos.devices.experiment import Experiment  # isort:skip

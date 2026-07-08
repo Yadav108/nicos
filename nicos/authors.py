@@ -21,7 +21,7 @@
 #
 # *****************************************************************************
 
-authors_list = """\
+authors_list = """
 NICOS is maintained by:
 
 * Georg Brandl <g.brandl@fz-juelich.de>
@@ -99,6 +99,7 @@ Instrument-specific code was contributed by:
 * Johanna Jochum <johanna.jochum@frm2.tum.de>
 * Ebad Kamil <ebad.kamil@ess.eu>
 * Stefanie Keuler <s.keuler@fz-juelich.de>
+* Yongjin Kim <yongjin.kim@frm2.tum.de>
 * Sabrina Kirstein <s.kirstein@fz-juelich.de>
 * Joachim Kohlbrecher <joachim.kohlbrecher@psi.ch>
 * Christine Klauser <christine.klauser@psi.ch>

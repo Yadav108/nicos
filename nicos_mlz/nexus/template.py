@@ -21,21 +21,41 @@
 #
 # *****************************************************************************
 
-"""Some convenience classes, methods for NeXus data writing."""
+"""MLZ specific base NeXus template provider."""
 
 from nicos import session
-from nicos.nexus.elements import ConstDataset, DeviceDataset, EndTime, \
-    NXAttribute, NXLink, StartTime
+from nicos.nexus.elements import ConstDataset, DetectorDataset, \
+    DeviceDataset, EndTime, NXAttribute, NXLink, StartTime
 from nicos.nexus.nexussink import NexusTemplateProvider, copy_nexus_template
 from nicos.nexus.specialelements import NicosProgramDataset
 
-from nicos_mlz.nexus import LocalContact, ReactorSource, SampleEnv, User
+from nicos_mlz.nexus import LocalContact, ReactorSource, SampleEnv, User, \
+    counts, signal
 
 NeXus_version = NXAttribute('4.4.3', 'string')
 NXDL_version = NXAttribute('v2024.02', 'string')
 
 
 class MLZTemplateProvider(NexusTemplateProvider):
+    """MLZ base NeXus template provider.
+
+    It generates the base NeXus template for the NeXus files generated at all
+    MLZ instruments.
+
+    It contains the:
+
+        - Version of this structure
+        - Generator program (NICOS including release number)
+        - Start and stop time of the measurement
+        - Experiment title (typical proposal description)
+        - Proposal identifier
+        - NXDL application definition
+        - Sections for
+          - Instrument
+          - Data
+          - Sample
+          - Users (local contact, users)
+    """
 
     detector = 'detector'
     entry = 'entry'
@@ -49,9 +69,10 @@ class MLZTemplateProvider(NexusTemplateProvider):
         self.temp_env = kwargs.get('temp_env', ['T', 'Ts'])
         self.magnet_env = kwargs.get('magnet_env', ['B'])
         self.stress_env = kwargs.get('stress_env', ['teload', 'tepos', 'teext'])
-        self.efield_env = kwargs.get('efield_env', [])
+        self.efield_env = kwargs.get('efield_env', ['E'])
+        self.detector = kwargs.get('detector', 'detector')
 
-    def getBase(self):
+    def _getBase(self):
 
         # definition_url = 'https://manual.nexusformat.org/classes/'
         #                  f'applications/{self.definition}.html'
@@ -88,11 +109,17 @@ class MLZTemplateProvider(NexusTemplateProvider):
                 f'{self.sample}:NXsample': {
                     'name': DeviceDataset(
                         session.experiment.sample.name, 'samplename'),
+                    'description': DeviceDataset(
+                        session.experiment.sample.name, 'sampledescription'),
                 },
             },
         }
 
     def updateData(self):
+        """Update the data section.
+
+        Data section is available via ``self._data``
+        """
         self._entry.update({
             'data:NXdata': {
                 'data': NXLink(f'/{self.entry}/{self.instrument}/'
@@ -103,47 +130,66 @@ class MLZTemplateProvider(NexusTemplateProvider):
         })
 
     def updateInstrument(self):
-        raise NotImplementedError
+        """Update the instrument section.
 
-    def updateDetector(self):
-        raise NotImplementedError
+        Instrument section is available via ``self._instrument``
+        """
 
     def updateEntry(self):
         pass
 
+    def _checkEnvironmentList(self, envlist):
+        devlist = set(session.experiment.envlist) & set(session.devices.keys())
+        return any(e in devlist for e in envlist)
+
     def updateSample(self):
-        if any(e in session.devices for e in self.temp_env):
+        """Update the sample section.
+
+        Sample section is available via ``self._sample``
+        """
+        if self._checkEnvironmentList(self.temp_env):
             self._sample.update({
                 'temperature_env:NXenvironment': {
                     'value_log:NXlog': SampleEnv(self.temp_env),
                 },
             })
-        if any(e in session.devices for e in self.magnet_env):
+        if self._checkEnvironmentList(self.magnet_env):
             self._sample.update({
                 'magnetic_field_env:NXenvironment': {
                     'value_log:NXlog': SampleEnv(self.magnet_env),
                 },
             })
-        if any(e in session.devices for e in self.stress_env):
+        if self._checkEnvironmentList(self.stress_env):
             self._sample.update({
                 'stress_field_env:NXenvironment': {
                     'value_log:NXlog': SampleEnv(self.stress_env, 1),
                 },
             })
-        if any(e in session.devices for e in self.efield_env):
+        if self._checkEnvironmentList(self.efield_env):
             self._sample.update({
                 'electric_field_env:NXenvironment': {
                     'value_log:NXlog': SampleEnv(self.efield_env),
                 },
             })
 
+    def updateDetector(self):
+        """Update the detector section.
+
+        Detector section is available via ``self._detector``
+        """
+        self._det.update({
+            'data': DetectorDataset(self.detector, dtype='int', units=counts,
+                                    signal=signal),
+        })
+
     def updateUsers(self):
+        """Update the user section."""
         self._entry.update({
             'local_contact:NXuser': LocalContact(),
             'proposal_user:NXuser': User(),
         })
 
-    def completeTemplate(self):
+    def _completeTemplate(self):
         """Fill `self._template` dictionary with desired NeXus structure."""
         self.updateInstrument()
         self.updateDetector()
@@ -153,11 +199,11 @@ class MLZTemplateProvider(NexusTemplateProvider):
         self.updateEntry()
 
     def getTemplate(self):
-        self._template = self.getBase()
+        self._template = copy_nexus_template(self._getBase())
         self._entry = self._template[f'{self.entry}:NXentry']
         self._inst = self._entry[f'{self.instrument}:NXinstrument']
         self._det = self._inst[f'{self.detector}:NXdetector']
         self._sample = self._entry[f'{self.sample}:NXsample']
 
-        self.completeTemplate()
+        self._completeTemplate()
         return copy_nexus_template(self._template)

@@ -1,9 +1,8 @@
-
 description = "DoubleSlit [slit k1] between nok8 and nok9"
 
 group = 'lowlevel'
 
-includes = ['nok_ref', 'zz_absoluts']
+includes = ['nok_ref', 'zz_absoluts', 'weg03']
 
 instrument_values = configdata('instrument.values')
 showcase_values = configdata('cf_showcase.showcase_values')
@@ -13,12 +12,12 @@ tango_base = instrument_values['tango_base']
 code_base = instrument_values['code_base']
 
 devices = dict(
-    bs1 = device(code_base + 'slits.DoubleSlit',
+    bs1 = device('nicos.devices.generic.slit.VerticalGap',
         description = 'BS1 double between nok8 and nok9',
-        fmtstr = 'open: %.3f, zpos: %.3f',
-        unit = 'mm',
-        slit_r = 'bs1r',
-        slit_s = 'bs1s',
+        bottom= 'bs1s',
+        top = 'bs1r',
+        opmode = 'offcentered',
+        min_opening = -1,
     ),
     bs1r = device(code_base + 'slits.SingleSlit',
         # length: 6.0 mm
@@ -65,23 +64,6 @@ devices = dict(
          device2 = 'bs1r_analog',
          visibility = showcase_values['hide_acc'],
     ),
-    bs1r_analog = device(code_base + 'nok_support.NOKPosition',
-        description = 'Position sensing for BS1, reactor side',
-        reference = 'nok_refc2',
-        measure = 'bs1r_poti',
-        # 2020-04-20 17:33:56 poly = [-108.4, 998.068 / 3.835],
-        # 2020-04-21 07:59:00 poly = [-106.429, 998.068 / 3.835],
-        poly = [-105.176, 998.068 / 3.835],
-        serial = 7542,
-        length = 250.0,
-        visibility = showcase_values['hide_poti'] & showcase_values['NOreference'],
-    ),
-    bs1r_poti = device(code_base + 'nok_sensor.NOKMonitoredVoltage',
-        description = 'Poti for BS1, reactor side',
-        tangodevice = tango_base + 'test/wb_c/2_1',
-        scale = 1,   # mounted from bottom
-        visibility = (),
-    ),
     bs1s_axis = device('nicos.devices.generic.Axis',
         description = 'Axis of BS1, sample side',
         motor = 'bs1s_motor',
@@ -97,24 +79,8 @@ devices = dict(
          device2 = 'bs1s_analog',
          visibility = showcase_values['hide_acc'],
     ),
-    bs1s_analog = device(code_base + 'nok_support.NOKPosition',
-        description = 'Position sensing for BS1, sample side',
-        reference = 'nok_refc2',
-        measure = 'bs1s_poti',
-        # 2020-04-29 11:56:21 poly = [39.1, 999.452 / 1.919],
-        poly = [39.1, 999.452 / 1.919],
-        serial = 7784,
-        length = 500.0,
-        visibility = showcase_values['hide_poti'] & showcase_values['NOreference'],
-    ),
-    bs1s_poti = device(code_base + 'nok_sensor.NOKMonitoredVoltage',
-        description = 'Poti for BS1, sample side',
-        tangodevice = tango_base + 'test/wb_c/2_5',
-        scale = 1,   # mounted from bottom
-        visibility = (),
-    ),
 )
 
 alias_config = {
-    'primary_aperture': {'bs1.opening': 200},
+    'primary_aperture': {'bs1.height': 200},
 }

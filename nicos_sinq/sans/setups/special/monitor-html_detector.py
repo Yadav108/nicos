@@ -1,7 +1,7 @@
 description = 'setup for the HTML status monitor'
 group = 'special'
 
-_detcolumn = Row(
+_detcolumn = Column(
     Block(
         'detector trolley', [
             BlockRow(
@@ -17,7 +17,7 @@ _detcolumn = Row(
     ),
 )
 
-_bscolumn = Row(
+_bscolumn = Column(
     Block(
         'beam stop', [
             BlockRow(
@@ -61,8 +61,7 @@ _live = Column(
 devices = dict(
     Monitor = device('nicos.services.monitor.html.Monitor',
         title = '',
-#        filename = '/afs/psi.ch/project/sinq/sinqstatus/sans1/detector.html',
-	filename = '/home/sans/data/html/detector.html',
+        filename = '/home/status/detector.html',
         interval = 10,
         loglevel = 'info',
         cache = 'localhost',

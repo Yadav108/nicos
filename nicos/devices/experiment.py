@@ -49,6 +49,7 @@ from nicos.utils.compression import zipFiles
 from nicos.utils.emails import sendMail
 from nicos.utils.ftp import ftpUpload
 from nicos.utils.loggers import ELogHandler
+from nicos.utils.user import splitUsers, combineUsers
 
 
 class Experiment(Device):
@@ -106,8 +107,11 @@ class Experiment(Device):
         'elog_hidden':    Param('True if the events sent to the electronic '
                                 'logbook should be hidden by default',
                                 type=bool, default=False, settable=True),
-        'scripts':        Param('Currently executed scripts', type=listof(str),
-                                settable=True, internal=True,
+        'scripts':        Param('Stack of currently executed scripts',
+                                type=listof(str), settable=True, internal=True,
+                                no_sim_restore=True),
+        'scriptnames':    Param('Stack of filenames of self.scripts',
+                                type=listof(str), settable=True, internal=True,
                                 no_sim_restore=True),
         'templates':      Param('Name of the directory with script templates '
                                 '(relative to dataroot)', type=str),
@@ -191,7 +195,7 @@ class Experiment(Device):
         self.data.reset()
 
     #
-    # hooks: may be overriden in derived classes to enhance functionality
+    # hooks: may be overridden in derived classes to enhance functionality
     #
 
     def proposalpath_of(self, proposal):
@@ -366,7 +370,7 @@ class Experiment(Device):
           of the samples in the `samples` dict
         * users: list of dicts with:
           * name: string
-          * email: string
+          * email: string (optional)
           * affiliation: string (optional)
         * localcontacts: list of dicts, with keys same as users
         * samples: optional list of dicts:
@@ -519,26 +523,13 @@ class Experiment(Device):
         return self.propinfo.get('title', 'Unknown')
 
     def doReadUsers(self):
-        res = []
-        for user in self.propinfo.get('users', []):
-            userstr = user['name']
-            if user.get('affiliation'):
-                userstr += ' (%s)' % user['affiliation']
-            res.append(userstr)
-        return ', '.join(res)
+        return combineUsers(self.propinfo.get('users', []))
 
     def doReadLocalcontact(self):
         if not self.propinfo.get('localcontacts'):
             if session._instrument:
-                return session.instrument.responsible
-
-        res = []
-        for user in self.propinfo.get('localcontacts', []):
-            userstr = user['name']
-            if user.get('email'):
-                userstr += ' <%s>' % user['email']
-            res.append(userstr)
-        return ', '.join(res)
+                return combineUsers(splitUsers(session.instrument.responsible))
+        return combineUsers(self.propinfo.get('localcontacts', []))
 
     def doUpdateManagerights(self, mrinfo):
         """Check the managerights dict into values used later."""
@@ -646,17 +637,9 @@ class Experiment(Device):
 
         # note: parameter names are singular for backwards compatibility
         if user:
-            if isinstance(user, list):
-                kwds['users'] = user
-            else:
-                kwds.setdefault('users', []).append({'name': user})
+            kwds['users'] = splitUsers(user)
         if localcontact:
-            if isinstance(localcontact, list):
-                kwds['localcontacts'] = localcontact
-            else:
-                kwds.setdefault('localcontacts', []).append(
-                    {'name': localcontact}
-                )
+            kwds['localcontacts'] = splitUsers(localcontact)
         kwds['proposal'] = proposal
 
         # check whether this proposal is finished - a thread is alive
@@ -765,11 +748,24 @@ class Experiment(Device):
         """
         propinfo = dict(self.propinfo)
         if title is not None:
-            propinfo['title'] = title
+            try:
+                propinfo['title'] = nonemptystring(title)
+            except ValueError as e:
+                raise ValueError(f'title {e}') from e
         if users is not None:
-            propinfo['users'] = users
+            if isinstance(users, list):
+                users = combineUsers(users)
+            try:
+                propinfo['users'] = splitUsers(nonemptystring(users))
+            except ValueError as e:
+                raise ValueError(f'users {e}') from e
         if localcontacts is not None:
-            propinfo['localcontacts'] = localcontacts
+            if isinstance(localcontacts, list):
+                localcontacts = combineUsers(localcontacts)
+            try:
+                propinfo['localcontacts'] = splitUsers(nonemptystring(localcontacts))
+            except ValueError as e:
+                raise ValueError(f'localcontacts {e}') from e
         self._setROParam('propinfo', propinfo)
         # Update cached values of the volatile parameters
         self._pollParam('title')
@@ -1073,11 +1069,19 @@ class Experiment(Device):
         """Called by `.AddUser`."""
         propinfo = dict(self.propinfo)
         users = list(propinfo.get('users', []))
-        users.append({
-            'name': name,
-            'email': email or '',
-            'affiliation': affiliation or '',
-        })
+        user = {'email': '', 'affiliation': ''}
+        try:
+            user['name'] = nonemptystring(name)
+        except ValueError as e:
+            raise ValueError(f'name {e}') from e
+        if email is not None:
+            user['email'] = mailaddress(email)
+        if affiliation is not None:
+            try:
+                user['affiliation'] = nonemptystring(affiliation)
+            except ValueError as e:
+                raise ValueError(f'affiliation {e}') from e
+        users.extend(splitUsers(combineUsers([user])))
         propinfo['users'] = users
         self._setROParam('propinfo', propinfo)
         self.log.info('User "%s" added', name)

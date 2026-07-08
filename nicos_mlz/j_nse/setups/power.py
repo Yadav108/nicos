@@ -18,10 +18,13 @@ devices = dict(
 )
 
 for i in range(1, 39):
-    name = 'pow%02d' % i
-    devices[name] = \
-        device('nicos.devices.entangle.PowerSupply',
-               description = 'Power Supply Port %02d' % i,
-               tangodevice = tango_base + 'supply/' + name,
-               unit = 'A',
-              )
+    devices[f'pow{i:02d}'] = \
+        device(
+            'nicos_mlz.j_nse.devices.jnse.JNSEPowerSupply',
+            description = f'Power Supply Port {i:02d}',
+            tangodevice = tango_base + f'supply/pow{i:02d}',
+            unit = 'A',
+            precision = 0.002,
+            visibility = ('metadata',) if i in [5, 9, 10, 11, 12] else \
+                ('devlist', 'metadata', 'namespace'),
+        )

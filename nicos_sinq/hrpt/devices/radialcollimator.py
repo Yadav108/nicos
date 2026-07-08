@@ -41,7 +41,7 @@ class RadialCollimator(EpicsDevice, MappedMoveable):
         Mark Koennecke, February 2019
     """
     parameters = {
-        'basepv': Param('Base name of the PVs with delimiter.', type=pvname,
+        'basepv': Param('Base name of the PVs with delimiter', type=pvname,
                         mandatory=True, settable=False, userparam=False),
         'target': Param('Target value for the radial collimator',
                         type=oneof('on', 'off'), mandatory=False,
@@ -120,5 +120,5 @@ class RadialCollimator(EpicsDevice, MappedMoveable):
         if not self.automatic:
             return
         if self.read() == 'off':
-            session.log.warning('Radial collimator stoppped during '
+            session.log.warning('Radial collimator stopped during '
                                 'measurement')

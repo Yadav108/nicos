@@ -1,6 +1,48 @@
 Changelog
 =========
 
+
+Release 3.13.2
+--------------
+
+* Core:
+
+  - Allow syntax for 'dev/key[0]' in key definition
+
+  - Improve synchronisation with cache in "Dry-Run"
+
+* GUI:
+
+  - Increase selectivity in "More" section of device commands
+
+  - No target display for nonmovables
+
+* DOC:
+
+  - Add missing parameter types, widgets, exceptions, facility specific classes,
+    overview of class types, introduction to the user doc, chapter about,
+    stopping / aborting devices and scripts, and remarks to to sample handling
+
+* Devices
+
+  - EPICS: poll 'precision' parameters, add velocity/jog mode support to Motor,
+    add status detection for 'homed' to Motor, fix reference, fix time-outs,
+    add 'epics_get' and 'epics_put' tool methods, Unpacks values returned from
+    Caproto into normal python types
+
+* Tests
+
+  - Improve EPICS motor tests
+
+  - Extend NeXus tests
+
+* Nexus
+
+  - Fixes automatic 'units' detection, exception in case no file has been opened
+
+* Installer
+
+
 Release 3.13.0
 --------------
 
@@ -461,7 +503,7 @@ Release 3.6.0
   - Non-Readable devices now also have an "active in dry-run" flag.
 
   - The new parameter validator "oneofdict_or" allows naming some special
-    device values while also supporting unnamed values inbetween.
+    device values while also supporting unnamed values in between.
 
   - The collector daemon can now map device keys when forwarding between caches.
 
@@ -581,7 +623,7 @@ Release 3.4.0
 
   - Added support for disabling devices.  The components here are a new
     'CanDisable' mixin, a new status 'DISABLED' to show disabled devices,
-    and new GUI elements to disable/reenable the devices.
+    and new GUI elements to disable/re-enable the devices.
 
   - The compatibility of new setups will be checked *before* starting to
     unload/load anything, so the user will not get an empty device list in case
@@ -615,7 +657,7 @@ Release 3.4.0
 * Commands
 
   - tomo: add a parameter to rearrange the 180 deg position into the sequence
-    of the positions instead beeing the first position.
+    of the positions instead being the first position.
 
   - Improved cosine fit.
 
@@ -1278,7 +1320,7 @@ Release 2.7.0
 
   - A new mixin has been created for communicating devices.  All these devices
     now have a "comtries" and a "comdelay" parameter, which can be used to
-    control retries and the sleep time inbetween retries.
+    control retries and the sleep time in between retries.
 
   - The "wait()" method is now not a fundamental operation for Moveables
     anymore.  Instead, the method "isCompleted()" has been added, and the
@@ -1459,7 +1501,7 @@ Release 2.5.0
     returned if none of the mapping entries matches.
 
   - Create a LockedDevice mixin which is used for devices needing a special
-    lock/unlock precedure using another device.
+    lock/unlock procedure using another device.
 
   - Added default implementations for "doWait", "doReset", "doStatus" and
     "doStop" that propagate the action to attached devices.
