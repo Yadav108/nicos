@@ -1,0 +1,43 @@
+[project]
+name = "nicos_virt_sinq"
+description = "NICOS Customizations and Extensions for virtual SINQ"
+requires-python = ">=3.9"
+dynamic = ["version"]
+dependencies = [
+    "nicos",
+    "nicos_sinq",
+]
+
+[project.optional-dependencies]
+gui = [
+    "nicos[gui]"
+]
+
+[dependency-groups]
+dev = [
+    "nicos"
+]
+
+[tool.uv.sources]
+# `nicos` dependencies should be installed from this workspace:
+nicos = { workspace = true }
+nicos_sinq = { workspace = true }
+
+# Define an entry point that allows to register this module as NICOS plugin.
+[project.entry-points."nicos.plugins"]
+VIRT_SINQ = "nicos_virt_sinq"
+
+# Configure build backend:
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning", "uv_build>=0.9.18,<0.10.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist.force-include]
+# Explicitly include files at module root and rewrite their path
+"." = "nicos_virt_sinq"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nicos_virt_sinq"]
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"

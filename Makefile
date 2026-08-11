@@ -2,12 +2,12 @@
 	guirc check setupcheck test testall test-coverage lint \
 	changelint manualrelease release help
 
-SHELL=/bin/bash
+SHELL = /bin/bash
 
 RCC5 = pyrcc5
 RCC6 = /usr/lib64/qt6/libexec/rcc
-PYTHON = /usr/bin/env python3
 UV = /usr/bin/env uv
+UV_RUN = $(UV) run --all-extras --all-groups --all-packages
 
 nicos/guisupport/gui_rc_qt5.py: resources/nicos-gui.qrc
 	-$(RCC5) -o $@ $<
@@ -29,30 +29,30 @@ clean-demo: clean
 	-rm -f data/current
 
 check:
-	$(PYTHON) tools/check-setups $(CHECK_DIRS)
+	$(UV_RUN) tools/check-setups $(CHECK_DIRS)
 
 setupcheck:
-	@$(PYTHON) tools/check-setups -s $(shell find . -mindepth 3 -type d -name setups | grep -v /test/) $(shell find . -name guiconfig.py)
+	@$(UV_RUN) tools/check-setups -s $(shell find . -mindepth 3 -type d -name setups | grep -v /test/) $(shell find . -name guiconfig.py)
 
 T =
 
 test:
-	@$(PYTHON) -m pytest -v $(T) --durations=20 --ignore test/test_stresstest $(O)
+	@$(UV_RUN) pytest -v $(T) --durations=20 --ignore test/test_stresstest $(O)
 
 testall:
-	@$(PYTHON) -m pytest -v $(T) --durations=20 $(O)
+	@$(UV_RUN) pytest -v $(T) --durations=20 $(O)
 
 test-coverage:
 	@COVERAGE_PROCESS_START=.coveragerc \
-		$(PYTHON) -m pytest -v $(T) --cov --cov-report=html --cov-report=term $(O)
+		$(UV_RUN) pytest -v $(T) --cov --cov-report=html --cov-report=term $(O)
 
 lint:
-	@-PYTHONPATH=.:${PYTHONPATH} pylint --rcfile=./pylintrc nicos/ nicos_*/ nicostools/ tools/* bin/*
+	@-PYTHONPATH=.:${PYTHONPATH} $(UV_RUN) pylint --rcfile=./pylintrc nicos/ nicos_*/ nicostools/ tools/* bin/*
 
 changelint:
 	@PYFILESCHANGED=$$(git diff --name-only --diff-filter=dux HEAD^...HEAD | grep "\.py$$" | grep -v setups) ; \
 	if [[ -n "$$PYFILESCHANGED" ]]; then \
-		PYTHONPATH=.:${PYTHONPATH} pylint --rcfile=./pylintrc $$PYFILESCHANGED; \
+		PYTHONPATH=.:${PYTHONPATH} $(UV_RUN) pylint --rcfile=./pylintrc $$PYFILESCHANGED; \
 	else echo 'no python files changed'; fi
 
 manualrelease: test release
