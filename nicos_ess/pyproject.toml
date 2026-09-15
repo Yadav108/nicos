@@ -38,7 +38,7 @@ estia = [
 [tool.uv.sources]
 # `nicos_ess` depends on `nicos`, which should be installed from this workspace:
 nicos = { workspace = true }
-# `yuos-query` is not published publically, so retrieve it from github
+# `yuos-query` is not published publicly, so retrieve it from github
 # 
 # FIXME: uses `build-deps` branch for now as the main branch does not specify
 # the dependencies needed at build time that the build backend seems to
