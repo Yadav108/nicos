@@ -1,0 +1,168 @@
+[project]
+name = "nicos"
+dynamic = ["version"]
+description = "The Networked Instrument Control System"
+authors = [
+    {name = "Georg Brandl", email = "g.brandl@fz-juelich.de"},
+]
+maintainers = [
+    {name="Jens Krüger", email="jens.krueger@frm2.tum.de"},
+]
+license = 'GPL-2.0-only'
+license-files = ["LICENSE", "AUTHORS"]
+readme = "README.md"
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'Natural Language :: English',
+    'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Scientific/Engineering :: Human Machine Interfaces',
+    'Topic :: Scientific/Engineering :: Physics',
+    'Topic :: Scientific/Engineering :: Visualization',
+]
+requires-python = ">=3.9"
+dependencies = [
+    "html2text>=3.200.3",
+    "importlib_metadata>=4.6;python_version<'3.10' and python_version>='3.6'",  # 3.10 brings recent-enough importlib.metadata
+    "ldap3>=2.0.0",
+    "lttb>=0.2.2",
+    "nicos-pyctl>=1.0",
+    "numpy>=1.14.0,<2.0",
+    "platformdirs>=2.5.4",
+    "psutil>=2.0",
+    "pyzmq>=13.1.0",
+    "rsa>=3.1.2",
+    "scipy>=0.9.0",
+    "tomlkit>=0.8.0",
+    "setuptools==81.0.0", # until we fix all pkg_resources usage 
+]
+
+[project.urls]
+Homepage = 'https://www.nicos-controls.org'
+Documentation = "https://forge.frm2.tum.de/nicos/doc/nicos-master/documentation"
+Repository = "https://forge.frm2.tum.de/review/plugins/gitiles/frm2/nicos/nicos"
+Issues = "https://forge.frm2.tum.de/redmine/projects/nicos/issues"
+
+
+[dependency-groups]
+dev = [
+    "coverage>=3.4",
+    "isort>=6.1.0",
+    "line-profiler>=5.0.0 ; sys_platform != 'win32'",
+    "memory-profiler>=0.61.0",
+    "pyftpdlib>=2.1.0",
+    "pylint>=2.1.0,<4.0",
+    "pytest>=4.6",
+    "pytest-cov>=2.2",
+    "pytest-qt>=3.2.2",
+    "pytest-randomly>=1.1",
+    "pytest-timeout>=1.3.1",
+    "pytest-xvfb>=3.0.0",
+    "pyyaml>=3.0",
+    "rst2pdf>=0.16",
+    "sphinx>=2.0",
+    "sphinx-rtd-theme>=3.1.0",
+    "yapf>=0.12.0",
+]
+
+[project.optional-dependencies]
+epics = [
+    "caproto>=0.8.1 ; platform_machine != 'arm64'",
+    "p4p>=4.0.0,<=4.2.0 ; platform_machine != 'arm64'",
+    "pyepics>=3.2.4 ; platform_machine != 'arm64'",
+]
+gui = [
+    "gr==1.23.3 ; sys_platform == 'darwin'",
+    "gr>=1.23.2",
+    "pyqt5>=5.13.0 ; sys_platform == 'linux'",
+    "pyqt5>=5.15.6 ; sys_platform == 'win32'",
+    "pyqt6>=6.7,<6.8 ; sys_platform == 'darwin'",
+    "pyqt6-qscintilla>=2.13 ; sys_platform == 'darwin'",
+    "pyqt6-qt6>=6.7,<6.8 ; sys_platform == 'darwin'",
+    "pyqt6-webengine>=6.7,<6.8 ; sys_platform == 'darwin'",
+    "pyqt6-webengine-qt6>=6.7,<6.8 ; sys_platform == 'darwin'",
+    "PyQtWebEngine>=5.13.0 ; sys_platform == 'linux'",
+    "PyQtWebEngine>=5.15.5 ; sys_platform == 'win32'",
+    "python-redmine>=2.0.0",
+    "qscintilla>=2.11 ; sys_platform == 'linux'",
+    "qscintilla>=2.12 ; sys_platform == 'win32'",
+    "sshtunnel>=0.4.0",
+    "uncertainties<=3.1.7",
+]
+opt = [
+    "astropy>=3.0",
+    "caproto>=0.8.1 ; platform_machine != 'arm64'",
+    "docutils>=0.12",
+    "frappy-core>=0.19.9",
+    "h5py>=2.6",
+    "influxdb-client[async,ciso]>=1.26.0",
+    "keyring>=10.6",
+    "keyrings-alt>=4.0",
+    "markdown>=2.6.9",
+    "nicos-quickyaml>=1.3.2 ; sys_platform != 'darwin'",
+    "opencv-python-headless>=3.0.0,<4.8",
+    "p4p>=4.0.0,<=4.2.0 ; platform_machine != 'arm64'",
+    "pamela>=0.3.0",
+    "pillow>=4.0.0",
+    "pycryptodomex>=3.4.7",
+    "pyepics>=3.2.4 ; platform_machine != 'arm64'",
+    "pyserial>=2.5",
+    "pytango>=9.0.0 ; sys_platform != 'darwin'",
+    "redbaron>=0.6.3",
+    "requests>=2.26.0",
+    "requests-oauthlib>=1.2.0",
+    "slackclient>=2.3.1",
+    "systemd-python>=230 ; sys_platform != 'darwin' and sys_platform != 'win32'",
+]
+
+# Add additional package index:
+[[tool.uv.index]]
+# Optional name for the index.
+name = "FRM2"
+# Required URL for the index.
+url = "https://forge.frm2.tum.de/simple"
+
+[tool.uv.workspace]
+members = ["nicos_*"]
+
+# Configure build backend:
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning", "uv_build>=0.9.18,<0.10.0"]
+build-backend = "hatchling.build"  # uv does not yet support dynamic metadata
+
+# Configure dynamic versioning:
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+# Configure source distribution:
+[tool.hatch.build.targets.sdist]
+only-include = ["nicos"]
+
+[tool.hatch.build.targets.sdist.force-include]
+# Include files outside the main package directory and (optionally) rewrite their path:
+"bin" = "bin"  # starter scripts
+
+# Configure wheel options:
+# See https://hatch.pypa.io/latest/plugins/builder/wheel/#options
+[tool.hatch.build.targets.wheel]
+packages = ["nicos"]
+
+# Install scripts:
+# requires directories to be present in the source distribution.
+[tool.hatch.build.targets.wheel.shared-scripts]
+"bin/" = "."
+
+
+
+[tool.ruff.format]
+quote-style = "single"

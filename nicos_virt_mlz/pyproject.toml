@@ -1,0 +1,43 @@
+[project]
+name = "nicos_virt_mlz"
+description = "NICOS Customizations and Extensions for virtual MLZ"
+requires-python = ">=3.9"
+dynamic = ["version"]
+dependencies = [
+    "nicos",
+    "nicos_mlz",
+]
+
+[project.optional-dependencies]
+gui = [
+    "nicos[gui]"
+]
+
+[dependency-groups]
+dev = [
+    "nicos[dev]"
+]
+
+[tool.uv.sources]
+# `nicos` dependencies should be installed from this workspace:
+nicos = { workspace = true }
+nicos_mlz = { workspace = true }
+
+# Define an entry point that allows to register this module as NICOS plugin.
+[project.entry-points."nicos.plugins"]
+VIRT_MLZ = "nicos_virt_mlz"
+
+# Configure build backend:
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning", "uv_build>=0.9.18,<0.10.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist.force-include]
+# Explicitly include files at module root and rewrite their path
+"." = "nicos_virt_mlz"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nicos_virt_mlz"]
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"

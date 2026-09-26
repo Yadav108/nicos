@@ -1,0 +1,97 @@
+FROM docker.ictrl.frm2.tum.de:5443/mlzbase/trixie AS epicsbuilder
+USER root
+ENV  DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Berlin
+RUN  apt-get update && apt-get install -y gnupg ca-certificates && apt-get upgrade -y && apt-get clean
+# this needs to be done after installing transport-https!
+COPY 01norecommend /etc/apt/apt.conf.d/01norecommend
+
+RUN apt-get update && apt-get -y install lintian git-buildpackage pristine-tar build-essential libreadline-dev debhelper dh-exec libparse-debcontrol-perl libtie-ixhash-perl
+
+RUN  mkdir dpack && \
+ cd dpack && \
+ mkdir tmp && \
+ git clone https://github.com/epicsdeb/epics-debhelper.git && \
+ cd epics-debhelper && \
+ gbp buildpackage --git-pristine-tar --git-export-dir=$PWD/../tmp  --git-no-sign-tags --no-sign  && \
+ dpkg -i ../tmp/*.deb && \
+ cd ../.. && rm -rf dpack
+RUN apt-get -y install  g++-mingw-w64
+RUN  mkdir dpack && \
+ cd dpack && \
+ mkdir out && \
+ git clone https://github.com/epicsdeb/epics-base.git && \
+ cd epics-base && \
+ gbp buildpackage --git-no-pristine-tar --git-export-dir=$PWD/../out  --git-no-sign-tags  --no-sign
+
+
+
+FROM debian:trixie
+
+
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+USER root
+ENV  DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Berlin
+
+# use a fixed volume for uv-caching
+RUN mkdir /uv-cache && chmod -R a+rw /uv-cache
+
+VOLUME /uv-cache
+ENV UV_CACHE_DIR=/uv-cache
+ENV UV_LINK_MODE=clone
+
+RUN  apt-get update && apt-get install -y gnupg ca-certificates && apt-get upgrade -y && apt-get clean
+# this needs to be done after installing transport-https!
+COPY 01norecommend /etc/apt/apt.conf.d/01norecommend
+
+# Install deps needed for building
+RUN apt-get update \
+  && apt-get -y install \
+   git \
+   build-essential \
+   libreadline-dev \
+   libsystemd-dev \
+   pkg-config \
+   libglib2.0-0 \
+   libsm6 \
+   libxrender1 \
+   libxext6 \
+   libgl-dev \
+   libegl1-mesa-dev\
+   libgl1-mesa-dri \
+   libegl1-mesa-dev \
+   libglu1-mesa \
+   libxcb.*-dev libx11-xcb-dev libglu1-mesa-dev libxrender-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev \
+   libfreetype-dev \
+   libmagic-dev \
+   libnss3 \
+   libqt5webenginecore5 \
+   python3 \
+  && apt-get clean
+
+COPY --from=docker.ictrl.frm2.tum.de:5443/jenkins/epicsbuilder:trixie /dpack/out  /tmp/out
+RUN ls -l /tmp/out  &&  dpkg -i /tmp/out/lib*.deb
+
+
+### setup  jenkins helpers
+# Add user jenkins to the image
+RUN groupadd -g 1001 jenkins && \
+    useradd -m -u 1001 -g 1001 -d /home/jenkins2 -s /bin/bash jenkins && \
+    mkdir /home/jenkins && chown jenkins:jenkins /home/jenkins && \
+    echo "jenkins:jenkins" | chpasswd
+
+
+
+USER jenkins
+WORKDIR /home/jenkins2
+RUN mkdir localws
+RUN uv python install 3.9 3.10 3.11 3.12 3.13
+RUN uv tool install git+https://forge.frm2.tum.de/review/frm2/taco/tools	
+ENV PATH="/home/jenkins2/.local/bin:${PATH}"
+ENV QT_QPA_PLATFORM=offscreen
+### end jenkins helpers
+
+## not yet included: epics build
