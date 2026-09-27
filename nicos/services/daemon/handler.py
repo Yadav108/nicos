@@ -27,8 +27,6 @@ commands.
 """
 
 import os
-import queue
-import socket
 import tempfile
 from base64 import b64decode, b64encode
 
@@ -43,7 +41,7 @@ from nicos.protocols.daemon import BREAK_NOW, DAEMON_COMMANDS, SIM_STATES, \
 from nicos.services.daemon.auth import AccessDeniedError, AuthenticationError
 from nicos.services.daemon.script import RequestError, ScriptError, \
     ScriptRequest
-from nicos.services.daemon.utils import LoggerWrapper, SizedQueue
+from nicos.services.daemon.utils import LoggerWrapper
 
 command_wrappers = {}
 
@@ -89,15 +87,11 @@ def command(needcontrol=False, needscript=None, name=None):
 
 
 # unique objects
-stop_queue = (object(), '', [])
 no_msg = object()
 
 
 class ConnectionHandler:
-    """Protocol-unaware connection handler.
-
-    This is used as a mixin base class for ServerTransport subclasses to
-    implement a specific protocol.
+    """Command handling for one authenticated daemon connection.
 
     Command methods must be decorated with the `@command` decorator; it
     registers the command for dispatching and avoids boilerplate: if the
@@ -110,22 +104,12 @@ class ConnectionHandler:
     def __init__(self, daemon):
         self.daemon = daemon
         self.controller = daemon._controller
-        # limit memory usage to 100 Megs
-        self.event_queue = SizedQueue(100*1024*1024)
         self.event_mask = set()
         self.log = LoggerWrapper(self.daemon.log, '[new handler] ')
 
     def setIdent(self, ident):
         self.ident = ident
         self.log.setPrefix('[handler #%s] ' % ident)
-
-    def close(self):
-        try:
-            self.event_queue.put(stop_queue, False)
-        except queue.Full:
-            # the event queue has already overflown because the event sender
-            # was already closed; so we can ignore this
-            pass
 
     def check_host(self):
         """Match the connecting host against the daemon's list of
@@ -167,7 +151,7 @@ class ConnectionHandler:
 
         authenticators = self.daemon.get_authenticators()
         pubkey, privkey = rsa.newkeys(512)
-        pubkey_base64 = b64encode(pubkey.save_pkcs1())
+        pubkey_base64 = b64encode(pubkey.save_pkcs1()).decode('ascii')
         bannerhashing = 'rsa,plain'
 
         # announce version, authentication modality and serializer
@@ -179,7 +163,7 @@ class ConnectionHandler:
             pw_hashing = bannerhashing,
             rsakey = pubkey_base64,
             protocol_version = self.get_version(),
-            serializer = self.serializer.name,
+            serializer = self.encoding,
         ))
 
         # read login credentials
@@ -226,6 +210,7 @@ class ConnectionHandler:
 
         # acknowledge the login
         self.log.info('login succeeded, access level %d', self.user.level)
+        self.authenticated = True
         self.send_ok_reply(dict(
             user_level = self.user.level,
         ))
@@ -237,37 +222,6 @@ class ConnectionHandler:
         while 1:
             command, data = self.recv_command()
             command_wrappers[command](self, data)
-
-    # -- Event thread entry point ---------------------------------------------
-
-    def event_sender(self):
-        """Take events from the handler instance's event queue and send them
-        to the client.
-        """
-        self.log.info('event sender started')
-        queue_get = self.event_queue.get
-        event_mask = self.event_mask
-        while 1:
-            item = queue_get()
-            if item is stop_queue:
-                break
-            event, data, blobs = item
-            if event in event_mask:
-                continue
-            try:
-                self.send_event(event, data, blobs)
-            except socket.timeout:
-                # XXX move socket specific error handling to transport
-                self.log.error('send timeout in event sender')
-                break
-            except OSError as err:
-                self.log.warning('connection broken in event sender: %s', err)
-                break
-            except Exception:
-                self.log.exception('exception in event sender; event: %s, '
-                                   'data: %s', event, repr(data)[:1000])
-        self.log.info('closing connections from event sender')
-        self.close()
 
     # -- Script control commands ----------------------------------------------
 

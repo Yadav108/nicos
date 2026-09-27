@@ -76,6 +76,11 @@ The Daemon device needs to have a ``server`` parameter that specifies the
 listening address ``host:port``, in our example ``localhost:1301`` since the
 default port is ``1301``.
 
+The daemon serves HTTP at this address.  NICOS clients use the authenticated
+WebSocket endpoint ``/api/v1/daemon``; ``/healthz`` is available for health
+checks.  Client and daemon must be upgraded together when switching from the
+earlier socket protocol.  See :doc:`/protocols/daemon` for the wire format.
+
 It also has a list attached devices, the ``authenticators``.  Authenticators
 determine if the login name and password presented in clients are accepted by
 the daemon, and which user level the user gets.  There are different

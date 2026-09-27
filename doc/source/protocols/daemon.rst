@@ -5,61 +5,60 @@ The daemon protocol
 Basics
 ======
 
-The daemon protocol consists of two socket connections: the command connection
-and the event connection.  The command connection is used in a request-reply
-mode, while the event connection is read-only for the client.
+The daemon serves HTTP on the host and port configured by its ``server``
+parameter (default port 1301).  ``GET /healthz`` returns ``ok``.  The
+authenticated daemon connection is a WebSocket at ``/api/v1/daemon``.  Commands,
+replies and unsolicited events share this connection.  Other HTTP routes can be
+registered on the same aiohttp application.
 
 Frame format
 ------------
 
-**Command connection**
+Choose one WebSocket subprotocol during the HTTP upgrade:
 
-A "request" frame on the command connection begins with the ASCII byte ENQ
-(0x5), followed by a 2-byte "command code", and the length of the payload as a
-network-order (big-endian) unsigned 32-bit integer.  The payload must be a
-serialized Python tuple with the arguments for the command.
+* ``nicos.msgpack.v1`` uses binary MessagePack frames.
+* ``nicos.json.v1`` uses UTF-8 JSON text frames.
 
-A reply frame on the command connection has one of three types: "ok", "error" or
-"data".  The first byte selects the type with the ASCII values ACK (0x6), NAK
-(0x15) and STX (0x2) respectively.
+The server requires a subprotocol.  Browser WebSocket requests must come from
+the same host and port as the HTTP application.  A reverse proxy can provide
+HTTPS/WSS for remote clients.
 
-"ok" frames have no further content; they consist of only one byte.
+Each frame is one msgspec message with a ``type`` field.  A ``banner`` contains
+``payload``.  A client sends a ``command`` with a positive integer ``id``, a
+``name`` from the daemon command list, and an ``args`` payload containing the
+argument list.  The daemon sends a ``reply`` with the same ``id``, a boolean
+``ok``, and a ``payload`` containing either the result or an error string.
+Commands from one client are handled in order; clients should wait for a reply
+before sending another command.
 
-For "error" and "data" frames, the following four bytes encode the length of the
-payload (i.e. frame length excluding first byte and length) as a network-order
-unsigned 32-bit integer.
+For example, a JSON client can authenticate with a text frame of this shape
+after receiving the banner::
 
-In both cases, the payload is a serialized Python object -- for "error" frames
-it should deserialize to a simple string explaining the error.
+   {"type":"command","id":1,"name":"authenticate",
+    "args":{"kind":"native","data":[{"login":"guest","passwd":"","display":""}]}}
 
-For "data" frames sent from the daemon to the client, the payload is a
-serialized Python object.
-
-**Event connection**
-
-On this connection, all data flows from daemon to client.  "Event" frames
-consist of an STX byte, a 2-byte "event code", a payload length encoded as
-usual, and the payload being the event data.
-
-For most events, the data is a serialized Python object, except for those where
-a lot of raw data has to be transferred, such that serialization is both slow
-and unnecessary.  In the Events_ documentation, deserialized transfer of data is
-noted where applicable.
+An ``event`` has ``name``, ``payload`` and ``blobs`` fields.  ``blobs`` is a list
+of byte strings for large live data.  In JSON these appear as base64 strings.
+If a JSON connection cannot represent an event payload, it receives an
+``event_error`` with the event ``name`` and a ``reason`` instead.
 
 Serialization
 -------------
 
-Serialization format is Python pickle format 2.
+Envelopes use typed msgspec messages.  Each payload has ``kind`` and ``data``
+fields.  ``kind: "native"`` contains ordinary values directly.  Tuples are
+transmitted as arrays.  Top-level byte payloads use ``kind: "bytes"`` and a
+base64 string on JSON connections.  Python-only objects on MessagePack
+connections use ``kind: "pickle"`` and a pickle byte string.  JSON connections
+never receive pickle payloads; a command whose result cannot be represented
+returns an error reply instead.  Pickle payloads from clients are accepted only
+after authentication.
 
 Handshake
 ---------
 
-First, a client must generate a random 32-byte ID used as the client ID (e.g.
-the MD5 of the host name and the current time, or 32 bytes of urandom data).
-
-Open a connection to the server port and send the client ID.  The daemon will
-check if the connecting host is allowed to connect, and then send a data frame
-with a serialized dictionary with at least the following keys:
+After the WebSocket upgrade, the daemon checks the connecting host and sends a
+``banner`` whose payload contains a dictionary with at least these keys:
 
 * ``daemon_version`` -- the NICOS version string of the daemon (mostly for
   informational purposes in the client)
@@ -69,29 +68,24 @@ with a serialized dictionary with at least the following keys:
   or 'plain'; the client should hash passwords with the given algorithm (except
   if it is 'plain') before sending
 
-The daemon then expects a "authenticate" command with a serialized dictionary,
+The daemon then expects an ``authenticate`` command with a dictionary,
 giving the login name (key "login"), the password (possibly hashed) (key
 "passwd") and a string to use as the :envvar:`DISPLAY` environment variable on
 the server (key "display").  The latter is mostly obsolete, as it is
 incompatible with logins from multiple machines; no value needs to be
 transferred.
 
-If the login name and password are accepted, the daemon sends back an "ok" frame
-and connection is ready to accept further commands.
-
-At this time, the client can open a second connection to the server port and
-send the client ID.  This connection will be detected as the event connection,
-and the client can then start receiving event frames on this connection.
+If the login name and password are accepted, the daemon sends a successful
+``reply`` and the connection is ready to accept further commands and events.
 
 
 Daemon functionality
 ====================
 
-The daemon operates with several threads: one thread accepts new connections.
-Two threads are started per connection: one to receive and handle commands, and
-one to send new events (which are pushed to the thread via a Queue).  Another
-thread executes user scripts, and a last thread monitors "watch expressions"
-that can be set by the clients and are evaluated continuously during runtime.
+The daemon runs an aiohttp event loop for HTTP and WebSocket I/O.  Each WebSocket
+has a worker thread for blocking command execution and one asynchronous writer
+for replies and events.  Another thread executes user scripts, and a watch
+thread evaluates expressions set by clients.
 
 Execution of code in the "script thread" is subject to a Python trace function,
 which means that debugger-like functionality is available: scripts can be
@@ -103,7 +97,7 @@ paused, stopped and updated at runtime.
 Commands
 ========
 
-These commands can be sent over the command socket.
+These commands can be sent over the WebSocket.
 
 Script commands
 ---------------
@@ -179,13 +173,10 @@ Events
 ======
 
 These are the events emitted by the daemon and transferred on the event
-connection.  Event data is serialized (using pickle, see Serialization_).
-However, some events can also transport a number of blobs in addition
-to the serialized data.
+connection.  Some events carry blobs in addition to their payload.
 
 The possible events are listed in the `nicos.protocols.daemon.DAEMON_EVENTS`
-dictionary, which maps the event name to a numeric identifier used in some
-protocols.
+dictionary.  The numeric identifiers remain for legacy documentation only.
 
 .. daemonevt:: message
 

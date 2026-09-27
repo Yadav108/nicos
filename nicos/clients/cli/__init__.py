@@ -49,7 +49,7 @@ from nicos.clients.cli.txtplot import txtplot
 from nicos.core import MAINTENANCE, MASTER, SIMULATION, SLAVE
 from nicos.protocols.daemon import BREAK_AFTER_LINE, BREAK_AFTER_STEP, \
     BREAK_NOW, SIM_STATES, STATUS_IDLE, STATUS_IDLEEXC, STATUS_INBREAK
-from nicos.protocols.daemon.classic import DEFAULT_PORT
+from nicos.protocols.daemon.websocket import DEFAULT_PORT
 from nicos.utils import LOCALE_ENCODING, colorize, formatDuration, \
     formatEndtime, parseConnectionString, terminalSize
 from nicos.utils.loggers import ACTION, INPUT

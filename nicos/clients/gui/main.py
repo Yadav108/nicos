@@ -37,7 +37,7 @@ from nicos.clients.gui.config import processGuiConfig
 from nicos.clients.gui.dialogs.instr_select import InstrSelectDialog
 from nicos.clients.gui.utils import DebugHandler
 from nicos.guisupport.qt import QApplication
-from nicos.protocols.daemon.classic import DEFAULT_PORT
+from nicos.protocols.daemon.websocket import DEFAULT_PORT
 from nicos.utils import importString, parseConnectionString
 from nicos.utils.loggers import ColoredConsoleHandler, NicosLogfileHandler, \
     NicosLogger, initLoggers

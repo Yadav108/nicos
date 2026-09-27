@@ -30,7 +30,7 @@ from nicos.clients.base import ConnectionData
 from nicos.clients.gui.utils import loadUi, splitTunnelString
 from nicos.guisupport.qt import QDialog, QFontMetrics, QIcon, \
     QListWidgetItem, QPalette, QPixmap, QSize, pyqtSlot
-from nicos.protocols.daemon.classic import DEFAULT_PORT
+from nicos.protocols.daemon.websocket import DEFAULT_PORT
 
 
 class ConnectionDialog(QDialog):

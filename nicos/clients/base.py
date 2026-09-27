@@ -32,11 +32,10 @@ from time import time as currenttime
 
 import rsa
 
-from nicos.clients.proto.classic import ClientTransport
+from nicos.clients.websocket import ClientTransport
 from nicos.protocols.daemon import ACTIVE_COMMANDS, DAEMON_EVENTS, \
     ProtocolError
-from nicos.protocols.daemon.classic import COMPATIBLE_PROTO_VERSIONS, \
-    PROTO_VERSION
+from nicos.protocols.daemon.websocket import PROTO_VERSION
 from nicos.utils import createThread
 
 BUFSIZE = 8192
@@ -48,18 +47,22 @@ class ErrorResponse(Exception):
 
 class ConnectionData:
     def __init__(self, host, port, user, password, viewonly=False,
-                 expertmode=False, **extrakwds):
+                 expertmode=False, wire_format='msgpack', tls=False,
+                 **extrakwds):
         self.host = host
         self.port = port
         self.user = user
         self.password = password
         self.viewonly = viewonly
         self.expertmode = expertmode
+        self.wire_format = wire_format
+        self.tls = tls
 
     def copy(self):
         # the copy shouldn't get the password to enforce a retyping of it
         return ConnectionData(self.host, self.port, self.user, None,
-                              self.viewonly, self.expertmode)
+                              self.viewonly, self.expertmode,
+                              self.wire_format, self.tls)
 
     def serialize(self):
         return vars(self)
@@ -74,10 +77,6 @@ class NicosClient:
     def __init__(self, log_func):
         self.host = ''
         self.port = 0
-
-        # if the daemon uses an old protocol version that we still support,
-        # we need to fix up some requests -- this is set to the old version
-        self.compat_proto = 0
 
         self.log_func = log_func
         self.lock = threading.Lock()
@@ -110,10 +109,12 @@ class NicosClient:
         try:
             self.transport.connect(conndata)
         except OSError as err:
+            self.transport.disconnect()
             msg = err.args[1] if len(err.args) >= 2 else str(err)
             self.signal('failed', 'Server connection failed: %s.' % msg, err)
             return
         except Exception as err:
+            self.transport.disconnect()
             self.signal('failed', 'Server connection failed: %s.' % err, err)
             return
 
@@ -126,14 +127,12 @@ class NicosClient:
                 raise ProtocolError('daemon version missing from response')
             daemon_proto = banner.get('protocol_version', 0)
             if daemon_proto != PROTO_VERSION:
-                if daemon_proto in COMPATIBLE_PROTO_VERSIONS:
-                    self.compat_proto = daemon_proto
-                else:
-                    raise ProtocolError('daemon uses protocol %d, but this '
-                                        'client requires protocol %d, do you '
-                                        'need to update NICOS?'
-                                        % (daemon_proto, PROTO_VERSION))
+                raise ProtocolError('daemon uses protocol %d, but this '
+                                    'client requires protocol %d, do you '
+                                    'need to update NICOS?'
+                                    % (daemon_proto, PROTO_VERSION))
         except Exception as err:
+            self.transport.disconnect()
             self.signal('failed', 'Server (%s:%d) handshake failed: %s.'
                         % (conndata.host, conndata.port, err), err)
             return
@@ -173,12 +172,6 @@ class NicosClient:
         if eventmask:
             self.tell('eventmask', eventmask)
 
-        try:
-            self.transport.connect_events(conndata)
-        except Exception as err:
-            self.signal('failed', 'Event connection failed: %s.' % err, err)
-            return
-
         # start event handler
         self.event_thread = createThread('event handler', self.event_handler)
 
@@ -202,6 +195,9 @@ class NicosClient:
                     self._close()
                 return
             try:
+                if event == 'protocol_error':
+                    self.signal('error', data)
+                    continue
                 if DAEMON_EVENTS[event][1]:
                     self.signal(event, data, blobs)
                 else:

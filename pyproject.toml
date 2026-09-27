@@ -32,10 +32,12 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "aiohttp>=3.8",
     "html2text>=3.200.3",
     "importlib_metadata>=4.6;python_version<'3.10' and python_version>='3.6'",  # 3.10 brings recent-enough importlib.metadata
     "ldap3>=2.0.0",
     "lttb>=0.2.2",
+    "msgspec>=0.18",
     "nicos-pyctl>=1.0",
     "numpy>=1.14.0,<2.0",
     "platformdirs>=2.5.4",
@@ -44,6 +46,7 @@ dependencies = [
     "rsa>=3.1.2",
     "scipy>=0.9.0",
     "tomlkit>=0.8.0",
+    "websocket-client>=1.6",
     "setuptools==81.0.0", # until we fix all pkg_resources usage 
 ]
 

@@ -37,7 +37,5 @@ devices = dict(
                   server='127.0.0.1',
                   authenticators=['Auth'],
                   loglevel='info',
-                  serializercls='nicos.protocols.daemon.classic.JsonSerializer',
-                  servercls='nicos.services.daemon.proto.zeromq.Server',
                   ),
 )
