@@ -14,6 +14,9 @@ from nicos.protocols.daemon import CloseConnection, ProtocolError, \
 from nicos.services.daemon.handler import ConnectionHandler
 from nicos.utils import createThread
 
+OUTGOING_BYTES_LIMIT = 100 * 1024 * 1024
+WRITE_TIMEOUT = 60
+
 
 class Server:
     """Serve HTTP routes and authenticated daemon WebSockets on one port."""
@@ -69,6 +72,7 @@ class Server:
         if not any(proto in offered for proto in wire.SUBPROTOCOLS):
             raise web.HTTPBadRequest(text='NICOS WebSocket subprotocol required')
         ws = web.WebSocketResponse(protocols=wire.SUBPROTOCOLS,
+                                   heartbeat=30,
                                    max_msg_size=128 * 1024 * 1024)
         await ws.prepare(request)
         encoding = 'json' if ws.ws_protocol == wire.SUBPROTOCOLS[1] else 'msgpack'
@@ -104,6 +108,7 @@ class Server:
                 handler.commands_in.put((command.id, command.name, args))
         except (ProtocolError, ValueError, TypeError,
                 msgspec.DecodeError) as err:
+            handler.close()
             handler.log.warning('protocol error: %s', err)
         finally:
             handler.close()
@@ -117,7 +122,15 @@ class Server:
         with self.lock:
             targets = [handler] if handler else list(self.handlers)
         for target in targets:
-            target.emit(event, data, blobs)
+            try:
+                target.emit(event, data, blobs)
+            except Exception:
+                # Event delivery must never interrupt the measurement thread.
+                try:
+                    target.close()
+                except Exception:
+                    pass
+                self.daemon.log.exception('closing failed daemon client')
 
     def stop(self):
         if self.loop and self.loop.is_running():
@@ -162,6 +175,7 @@ class Handler(ConnectionHandler):
         except CloseConnection:
             pass
         except Exception:
+            self.close()
             self.log.exception('unexpected handler error')
         finally:
             self.close()
@@ -207,14 +221,14 @@ class Handler(ConnectionHandler):
             return
         encoded = wire.encode(message, self.encoding)
         with self.out_lock:
-            if self.out_bytes + len(encoded) > 100 * 1024 * 1024:
+            if self.out_bytes + len(encoded) > OUTGOING_BYTES_LIMIT:
                 overflow = True
             else:
                 overflow = False
                 self.out_bytes += len(encoded)
         if overflow:
-            self.log.warning('outgoing queue full, closing connection')
             self.close()
+            self.log.warning('outgoing queue full, closing connection')
             return
         try:
             self.server.loop.call_soon_threadsafe(self._enqueue_encoded,
@@ -240,10 +254,10 @@ class Handler(ConnectionHandler):
                 break
             try:
                 if self.encoding == 'json':
-                    await self.ws.send_str(data)
+                    await asyncio.wait_for(self.ws.send_str(data), timeout=WRITE_TIMEOUT)
                 else:
-                    await self.ws.send_bytes(data)
-            except (OSError, ConnectionError):
+                    await asyncio.wait_for(self.ws.send_bytes(data), timeout=WRITE_TIMEOUT)
+            except Exception:
                 self.close()
                 break
             finally:
@@ -256,6 +270,19 @@ class Handler(ConnectionHandler):
                 return
             self.closed = True
         self.commands_in.put(None)
-        if self.server.loop and self.server.loop.is_running():
-            self.server.loop.call_soon_threadsafe(self.outgoing.put_nowait, None)
-            asyncio.run_coroutine_threadsafe(self.ws.close(), self.server.loop)
+        loop = self.server.loop
+        if loop and loop.is_running():
+            try:
+                loop.call_soon_threadsafe(self._close_on_loop)
+            except RuntimeError:
+                pass
+
+    def _close_on_loop(self):
+        self.outgoing.put_nowait(None)
+        asyncio.create_task(self._close_socket())
+
+    async def _close_socket(self):
+        try:
+            await self.ws.close()
+        except (OSError, ConnectionError, RuntimeError):
+            pass
