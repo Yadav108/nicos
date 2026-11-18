@@ -12,6 +12,7 @@ from aiohttp import WSMsgType, web
 from nicos.protocols.daemon import CloseConnection, ProtocolError, \
     websocket as wire
 from nicos.services.daemon.handler import ConnectionHandler
+from nicos.services.daemon.mcp import McpEndpoint
 from nicos.utils import createThread
 
 OUTGOING_BYTES_LIMIT = 100 * 1024 * 1024
@@ -36,6 +37,8 @@ class Server:
         app = web.Application()
         app.router.add_get(wire.WS_PATH, self.websocket)
         app.router.add_get('/healthz', self.health)
+        self.mcp = McpEndpoint(self.daemon)
+        app.router.add_post('/mcp', self.mcp_request)
         self.runner = web.AppRunner(app)
 
         async def serve():
@@ -55,10 +58,11 @@ class Server:
     async def health(self, request):
         return web.Response(text='ok')
 
-    async def websocket(self, request):
+    def _check_client(self, request):
+        """Reject cross-origin and untrusted clients; return the peer names."""
         origin = request.headers.get('Origin')
         if origin and urlsplit(origin).netloc != request.host:
-            raise web.HTTPForbidden(text='cross-origin WebSocket denied')
+            raise web.HTTPForbidden(text='cross-origin request denied')
         host = request.remote or ''
         try:
             names = [socket.gethostbyaddr(host)[0], host]
@@ -67,6 +71,14 @@ class Server:
         if self.daemon.trustedhosts and not any(
                 name in self.daemon.trustedhosts for name in names):
             raise web.HTTPForbidden(text='permission denied')
+        return names
+
+    async def mcp_request(self, request):
+        self._check_client(request)
+        return await self.mcp.handle(request)
+
+    async def websocket(self, request):
+        names = self._check_client(request)
         offered = [part.strip() for part in
                    request.headers.get('Sec-WebSocket-Protocol', '').split(',')]
         if not any(proto in offered for proto in wire.SUBPROTOCOLS):
