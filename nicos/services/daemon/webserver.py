@@ -13,6 +13,7 @@ from nicos.protocols.daemon import CloseConnection, ProtocolError, \
     websocket as wire
 from nicos.services.daemon.handler import ConnectionHandler
 from nicos.services.daemon.mcp import McpEndpoint
+from nicos.services.daemon.mcp_tools import TOOLS as MCP_TOOLS
 from nicos.utils import createThread
 
 OUTGOING_BYTES_LIMIT = 100 * 1024 * 1024
@@ -37,7 +38,7 @@ class Server:
         app = web.Application()
         app.router.add_get(wire.WS_PATH, self.websocket)
         app.router.add_get('/healthz', self.health)
-        self.mcp = McpEndpoint(self.daemon)
+        self.mcp = McpEndpoint(self.daemon, MCP_TOOLS)
         app.router.add_post('/mcp', self.mcp_request)
         self.runner = web.AppRunner(app)
 
