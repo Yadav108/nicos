@@ -1,6 +1,7 @@
 """Tests for the daemon's MCP tools."""
 
 import json
+import logging
 import re
 import time
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from nicos.core.status import BUSY, OK
 from nicos.protocols.daemon import STATUS_IDLE, STATUS_RUNNING
 from nicos.services.daemon import mcp_tools
 from nicos.services.daemon.mcp import INSTRUCTIONS, McpContext, ToolError
+from nicos.utils.loggers import INPUT
 
 from test.test_daemon.test_client import load_setup
 from test.utils import daemon_addr
@@ -74,7 +76,7 @@ hidden_cmd.is_usercommand = True
 hidden_cmd.is_hidden = True
 
 
-def _context(status=STATUS_IDLE, script=None):
+def _context(status=STATUS_IDLE, script=None, messages=()):
     devices = {
         'motor1': FakeDevice('Sample rotation', 'deg'),
         'temp1': FakeDevice('Sample temperature', 'K'),
@@ -100,7 +102,8 @@ def _context(status=STATUS_IDLE, script=None):
     )
     controller = SimpleNamespace(status=status, current_script=script,
                                  lineno=7)
-    return McpContext(session, SimpleNamespace(_controller=controller))
+    return McpContext(session, SimpleNamespace(_controller=controller,
+                                               _messages=list(messages)))
 
 
 def test_overview():
@@ -439,3 +442,198 @@ def test_get_device_info_on_daemon(client):
     is_error, text = _call_tool('get_device_info', {'device': 'dm1'})
     assert is_error
     assert text == "unknown argument 'device'; allowed: devices, setup"
+
+
+# -- output logs, with messages shaped like those of a real daemon ---------
+
+T0 = time.mktime((2026, 11, 24, 14, 44, 0, 0, 0, -1))
+NAME_ERROR = '''\
+Traceback (most recent call last):
+  File "/nicos/services/daemon/script.py", line 157, in execute
+    controller.start_exec(self.code[self.curblock],
+        password             = 'hunter2'
+
+  File "<script>", line 3, in <module>
+    x = undefined_name
+NameError: name 'undefined_name' is not defined'''
+LIMIT_ERROR = '''\
+Traceback (most recent call last):
+  File "/nicos/core/device.py", line 1707, in _check_start
+    raise LimitError(self, 'moving to %s is not allowed: %s' %
+        pos                  = 9999.0
+
+nicos.core.errors.LimitError: [sth_st] moving to 9999.000 deg is not allowed'''
+MESSAGES = [
+    ('nicos', T0, INPUT,
+     '>>> [admin 2026-11-24 14:44:00]  scan(sth, 304, 0.5, 5, t=0.2)\n',
+     None, 'r1'),
+    ('nicos', T0 + 1, logging.INFO, '=' * 100 + '\n', None, 'r1'),
+    ('nicos', T0 + 2, logging.INFO,
+     '1/5      304.000  2.001    0.200    637\n', None, 'r1'),
+    ('nicos', T0 + 3, logging.DEBUG, 'debug detail\n', None, 'r1'),
+    ('nicos', T0 + 60, INPUT,
+     '>>> [user 2026-11-24 14:45:00] -------------------- run.py\n'
+     'for i in range(2):\n    maw(T, 5)\nx = undefined_name\n' + '-' * 40,
+     None, 'r2'),
+    ('T', T0 + 61, logging.INFO, 'moving to 5.000 K\n', None, 'r2'),
+    ('nicos', T0 + 62, logging.WARNING, 'helium level low\n', None, 'r2'),
+    ('nicos', T0 + 63, logging.ERROR,
+     "NameError - name 'undefined_name' is not defined\n", NAME_ERROR, 'r2'),
+    ('sth_st', T0 + 64, logging.ERROR, 'Out of bounds - [sth_st] moving to '
+     '9999.000 deg is not allowed\n', LIMIT_ERROR, 'r3'),
+]
+
+
+def _logs(messages=None, **arguments):
+    context = _context(messages=MESSAGES if messages is None else messages)
+    return mcp_tools.get_output_logs(context, **arguments)
+
+
+def test_logs_all():
+    text = _logs()
+    lines = text.splitlines()
+    assert lines[0].startswith('# get_output_logs | view=all | '
+                               '14:44:00 to 14:45:04 (')
+    assert lines[1] == '# shown 8 of 8 | truncated: no | cursor: none'
+    assert '# buffer: 9 messages since 2026-11-24 14:44:00' in text
+    assert '14:44:00 > scan(sth, 304, 0.5, 5, t=0.2) (by admin)' in lines
+    # rulers and blank runs that only align console output are shortened
+    assert '14:44:01 ==========' in lines
+    assert '14:44:02 1/5  304.000  2.001  0.200  637' in lines
+    assert 'debug detail' not in text
+    assert '14:45:01 T: moving to 5.000 K' in lines
+    assert '14:45:02 WARNING helium level low' in lines
+
+
+def test_logs_tracebacks_are_short():
+    lines = _logs().splitlines()
+    i = lines.index("14:45:03 ERROR NameError - name 'undefined_name' is "
+                    "not defined")
+    assert lines[i + 1] == '    stopped at script line 3: x = undefined_name'
+    assert lines[i + 2].startswith('14:45:04 ERROR sth_st: Out of bounds')
+    text = '\n'.join(lines)
+    # no frames, no local variables
+    assert 'hunter2' not in text
+    assert 'device.py' not in text
+
+
+def test_logs_traceback_keeps_new_exception_text():
+    message = ('nicos', T0, logging.ERROR, 'error in scan\n',
+               'Traceback (most recent call last):\n  File "x.py", line 1\n'
+               'ValueError: bad step', None)
+    assert '    ValueError: bad step' in _logs([message]).splitlines()
+
+
+def test_logs_script_code_keeps_indentation():
+    lines = _logs(view='input').splitlines()
+    i = lines.index('14:45:00 > script run.py (by user):')
+    assert lines[i + 1:i + 4] == ['    for i in range(2):',
+                                  '        maw(T, 5)',
+                                  '    x = undefined_name']
+    assert not any(set(line.strip()) == {'-'} for line in lines)
+
+
+def test_logs_views():
+    text = _logs(view='input')
+    assert 'shown 2 of 2' in text
+    assert 'moving to' not in text
+    text = _logs(view='problems')
+    assert 'shown 5 of 5' in text
+    assert 'helium level low' in text
+    assert 'run.py' in text
+    assert 'moving to 5.000 K' not in text
+
+
+def test_logs_paging_with_cursor():
+    text = _logs(last_n=3)
+    assert '# shown 3 of 8 | truncated: yes | cursor: %r' % (T0 + 62) in text
+    assert 'cursor=' in text
+    text = _logs(last_n=3, cursor=repr(T0 + 62))
+    assert 'shown 3 of 5 | truncated: yes' in text
+    assert '14:44:02 1/5' in text
+    assert 'helium' not in text
+    text = _logs(last_n=3, cursor=repr(T0 + 2))
+    assert 'shown 2 of 2 | truncated: no | cursor: none' in text
+
+
+def test_logs_time_window():
+    assert 'shown 5 of 5' in _logs(**{'from': '2026-11-24 14:45'})
+    assert 'shown 3 of 3' in _logs(**{'to': '2026-11-24T14:44:30'})
+    now = time.time()
+    recent = [('nicos', now - 7200, logging.INFO, 'two hours ago', None, ''),
+              ('nicos', now - 60, logging.INFO, 'a minute ago', None, '')]
+    text = _logs(recent, **{'from': '-1h', 'to': 'now'})
+    assert 'a minute ago' in text
+    assert 'two hours ago' not in text
+    assert 'shown 2 of 2' in _logs(recent, **{'from': '-3h'})
+
+
+def test_logs_filter():
+    assert 'shown 1 of 1' in _logs(filter='HELIUM')
+    # also matches the source of a message
+    assert '14:45:01 T: moving' in _logs(filter='^T$')
+    # not a valid regular expression: used as plain text
+    text = _logs(filter='scan(')
+    assert 'shown 1 of 1' in text
+    assert "filter='scan('" in text
+    text = _logs(filter='nothing like this')
+    assert '# nothing found' in text
+
+
+def test_logs_dates_across_days():
+    messages = [('nicos', T0 - 86400, logging.INFO, 'yesterday', None, ''),
+                ('nicos', T0, logging.INFO, 'today', None, '')]
+    assert '2026-11-24 14:44:00 today' in _logs(messages).splitlines()
+
+
+def test_logs_size_limits():
+    messages = [('nicos', T0 + i, logging.INFO, 'x' * 5000, None, '')
+                for i in range(mcp_tools.MAX_LOG_ITEMS)]
+    text = _logs(messages, last_n=mcp_tools.MAX_LOG_ITEMS)
+    assert len(text) <= mcp_tools.REPLY_LIMIT
+    assert '[cut, 4700 more chars]' in text
+    assert 'truncated: yes' in text
+    # the newest messages are kept
+    assert _logs(messages[-1:]).splitlines()[-1] in text.splitlines()
+    script = ('nicos', T0, INPUT, '>>> [a 2026-11-24 14:44:00] -- x\n' +
+              'read()\n' * 1000, None, '')
+    assert '[cut, ' in _logs([script])
+
+
+def test_logs_empty_buffer():
+    text = _logs([])
+    assert '# nothing found' in text
+    assert 'buffer: empty' in text
+    assert 'logs: none yet' in mcp_tools.get_overview(_context())
+    assert 'logs: 9 messages since 2026-11-24 14:44:00 -> get_output_logs' \
+        in mcp_tools.get_overview(_context(messages=MESSAGES))
+
+
+@pytest.mark.parametrize('arguments, error', [
+    ({'view': 'inputs'}, 'did you mean: input'),
+    ({'last_n': 0}, 'last_n must be'),
+    ({'last_n': 201}, 'last_n must be'),
+    ({'last_n': '5'}, 'last_n must be'),
+    ({'last_n': True}, 'last_n must be'),
+    ({'from': 'yesterday'}, "cannot read from='yesterday'"),
+    ({'cursor': 'abc'}, 'invalid cursor'),
+])
+def test_logs_bad_arguments(arguments, error):
+    with pytest.raises(ToolError, match=error):
+        _logs(**arguments)
+
+
+def test_get_output_logs_on_daemon(client):
+    load_setup(client, 'daemontest')
+    client.run_and_wait("printinfo('hello from the mcp test')")
+
+    is_error, text = _call_tool('get_output_logs', {'filter': 'mcp test'})
+    assert not is_error, text
+    assert re.search(r"\d\d:\d\d:\d\d > printinfo\('hello from the mcp "
+                     r"test'\) \(by user\)", text)
+    assert re.search(r'\d\d:\d\d:\d\d hello from the mcp test', text)
+
+    is_error, text = _call_tool('get_output_logs', {'view': 'input',
+                                                    'last_n': 1})
+    assert not is_error, text
+    assert 'shown 1 of' in text
